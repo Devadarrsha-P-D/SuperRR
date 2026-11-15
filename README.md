@@ -37,3 +37,12 @@ delta and consistency are reported as diagnostics. See `outputs/validation_predi
 - `outputs/ratings_*_full.csv` - all eligible players (88 batters, 97 bowlers)
 - `outputs/figures/` - report figures
 - `src/exploration/` - scratch diagnostics behind design decisions
+
+## Deploy the site to Vercel
+
+The static site is configured with `vercel.json` and is served from `site/`.
+`site/data.json` is committed because it is the site's runtime data feed.
+
+1. Import this repository into Vercel.
+2. Keep the project root at the repository root.
+3. Leave the build command empty; Vercel serves the static files directly.

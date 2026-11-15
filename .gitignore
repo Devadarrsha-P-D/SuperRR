@@ -12,6 +12,7 @@ data/raw/
 outputs/
 report/
 site/data.json
+!site/data.json
 
 # Local tooling and logs
 .pytest_cache/
