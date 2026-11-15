@@ -1,0 +1,547 @@
+<title>Pressure Ledger</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,500..900&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: broadcast-scoreboard feel. Sticky section nav, wide hero with a two-row scorecard, then one band per question
+   (who ranks, who is where, what counts as pressure, how scored, did it hold up, what can go wrong). */
+:root {
+  --bg: #F1F2F8;
+  --surface: #FFFFFF;
+  --surface2: #E8EAF5;
+  --ink: #0D1230;
+  --ink2: #4A5072;
+  --ink3: #7A80A0;
+  --line: #D9DCEB;
+  --accent: #D81B73;       /* batters */
+  --accent-soft: #FBE1ED;
+  --blue: #2747E0;         /* bowlers */
+  --blue-soft: #E0E6FD;
+  --good: #0E8F5A;
+  --warn: #B86E00;
+  --bad: #C4302B;
+  --display: "Archivo", "Arial Narrow", system-ui, sans-serif;
+  --body: "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --mono: "JetBrains Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0A0D1F; --surface: #12162E; --surface2: #1A1F3D; --ink: #EEF0FB; --ink2: #A8AED0; --ink3: #7E85AD; --line: #262B4D;
+    --accent: #FF4D9A; --accent-soft: #3A1530; --blue: #8CA0FF; --blue-soft: #1B2457; --good: #3DD598; --warn: #F0A23A; --bad: #FF6B63;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0A0D1F; --surface: #12162E; --surface2: #1A1F3D; --ink: #EEF0FB; --ink2: #A8AED0; --ink3: #7E85AD; --line: #262B4D;
+  --accent: #FF4D9A; --accent-soft: #3A1530; --blue: #8CA0FF; --blue-soft: #1B2457; --good: #3DD598; --warn: #F0A23A; --bad: #FF6B63;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+html { scroll-behavior: smooth; }
+body { background: var(--bg); color: var(--ink); font-family: var(--body); font-size: 15px; line-height: 1.55; }
+.wrap { max-width: 1120px; margin-inline: auto; padding-inline: max(16px, env(safe-area-inset-left, 0px)) max(16px, env(safe-area-inset-right, 0px)); }
+h1, h2, h3 { font-family: var(--display); font-stretch: 108%; letter-spacing: -0.01em; text-wrap: balance; margin: 0; line-height: 1.04; }
+h1 { font-size: clamp(2.4rem, 6.4vw, 4.6rem); font-weight: 850; }
+h2 { font-size: clamp(1.7rem, 3.6vw, 2.5rem); font-weight: 800; }
+h3 { font-size: 1.15rem; font-weight: 750; line-height: 1.2; }
+p { margin: 0; }
+.mono, .num { font-family: var(--mono); font-variant-numeric: tabular-nums; }
+.eyebrow { font-family: var(--mono); font-size: 0.72rem; letter-spacing: 0.14em; text-transform: uppercase; color: var(--ink3); }
+.lede { font-size: 1.1rem; color: var(--ink2); max-width: 62ch; }
+.muted { color: var(--ink2); }
+a { color: inherit; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 4px; }
+
+/* nav */
+.top { position: sticky; top: env(safe-area-inset-top, 0px); z-index: 20; background: color-mix(in srgb, var(--bg) 88%, transparent); backdrop-filter: blur(10px); border-bottom: 1px solid var(--line); }
+body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-area-inset-top, 0px); z-index: 30; background: var(--bg); }
+.top .wrap { display: flex; align-items: center; gap: 20px; height: 52px; }
+.brand { font-family: var(--display); font-stretch: 112%; font-weight: 850; letter-spacing: -0.01em; white-space: nowrap; }
+.brand i { font-style: normal; color: var(--accent); }
+.top nav { display: flex; gap: 4px; overflow-x: auto; scrollbar-width: none; margin-left: auto; }
+.top nav a { text-decoration: none; font-size: 0.85rem; color: var(--ink2); padding: 6px 10px; border-radius: 6px; white-space: nowrap; }
+.top nav a:hover { background: var(--surface2); color: var(--ink); }
+
+/* hero */
+.hero { padding-block: 56px 40px; }
+.hero-grid { display: grid; grid-template-columns: 1.25fr 1fr; gap: 40px; align-items: end; }
+.hero h1 em { font-style: normal; color: var(--accent); }
+.hero .lede { margin-top: 20px; }
+.score { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; overflow: hidden; }
+.score header { display: flex; justify-content: space-between; padding: 10px 16px; background: var(--ink); color: var(--bg); font-family: var(--mono); font-size: 0.7rem; letter-spacing: 0.12em; text-transform: uppercase; }
+.score .srow { display: grid; grid-template-columns: 28px 1fr auto; gap: 12px; align-items: center; padding: 12px 16px; border-top: 1px solid var(--line); }
+.score .srow:first-of-type { border-top: 0; }
+.score .rk { font-family: var(--mono); font-size: 0.8rem; color: var(--ink3); }
+.score .nm { font-weight: 600; }
+.score .vl { font-family: var(--mono); font-size: 0.9rem; font-weight: 500; }
+.score .tag { font-size: 0.68rem; font-family: var(--mono); letter-spacing: 0.1em; text-transform: uppercase; padding: 2px 6px; border-radius: 4px; }
+.tag.bat { background: var(--accent-soft); color: var(--accent); }
+.tag.bowl { background: var(--blue-soft); color: var(--blue); }
+.stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 0; margin-top: 40px; border-block: 1px solid var(--line); }
+.stats div { padding: 18px 16px; border-left: 1px solid var(--line); }
+.stats div:first-child { border-left: 0; padding-left: 0; }
+.stats b { display: block; font-family: var(--display); font-stretch: 108%; font-size: clamp(1.6rem, 3.4vw, 2.3rem); font-weight: 800; line-height: 1; }
+.stats span { font-size: 0.8rem; color: var(--ink2); }
+
+/* bands */
+section.band { padding-block: 72px; border-top: 1px solid var(--line); }
+.band-head { display: grid; gap: 14px; margin-bottom: 32px; max-width: 70ch; }
+.toggle { display: inline-flex; background: var(--surface2); border-radius: 10px; padding: 3px; gap: 2px; }
+.toggle button { appearance: none; border: 0; background: transparent; color: var(--ink2); font: 600 0.85rem var(--body); padding: 8px 14px; border-radius: 8px; cursor: pointer; }
+.toggle button[aria-pressed="true"] { background: var(--surface); color: var(--ink); box-shadow: 0 1px 3px rgba(13, 18, 48, 0.15); }
+.bar-row { display: flex; flex-wrap: wrap; gap: 16px; align-items: center; justify-content: space-between; margin-bottom: 18px; }
+
+/* ranking list */
+.rank { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.rank details { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; }
+.rank summary { list-style: none; cursor: pointer; display: grid; grid-template-columns: 44px minmax(0, 1.1fr) minmax(0, 1.4fr) auto 24px; gap: 16px; align-items: center; padding: 14px 16px; }
+.rank summary::-webkit-details-marker { display: none; }
+.rank .n { font-family: var(--display); font-stretch: 112%; font-size: 1.9rem; font-weight: 850; color: var(--ink3); line-height: 1; }
+.rank details:nth-child(-n+3) .n { color: var(--side); }
+.rank .who b { display: block; font-weight: 600; font-size: 1rem; }
+.rank .who span { font-size: 0.78rem; color: var(--ink2); }
+.meter { display: grid; gap: 4px; }
+.meter .track { height: 10px; background: var(--surface2); border-radius: 3px; overflow: hidden; }
+.meter .fill { height: 100%; background: var(--side); border-radius: 0 3px 3px 0; }
+.meter .val { font-family: var(--mono); font-size: 0.8rem; color: var(--ink2); }
+.meter .val b { color: var(--ink); font-weight: 500; }
+.chip { font-family: var(--mono); font-size: 0.74rem; padding: 4px 9px; border-radius: 99px; white-space: nowrap; border: 1px solid var(--line); color: var(--ink2); }
+.chip.solid { background: color-mix(in srgb, var(--good) 14%, var(--surface)); border-color: color-mix(in srgb, var(--good) 40%, var(--line)); color: var(--good); }
+.chip.mid { background: color-mix(in srgb, var(--warn) 12%, var(--surface)); border-color: color-mix(in srgb, var(--warn) 40%, var(--line)); color: var(--warn); }
+.chip.edge { background: color-mix(in srgb, var(--bad) 10%, var(--surface)); border-color: color-mix(in srgb, var(--bad) 38%, var(--line)); color: var(--bad); }
+.chev { width: 10px; height: 10px; border-right: 2px solid var(--ink3); border-bottom: 2px solid var(--ink3); transform: rotate(45deg); transition: transform 0.15s; justify-self: center; }
+details[open] .chev { transform: rotate(-135deg); }
+.detail { padding: 4px 16px 18px 76px; display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 14px 20px; }
+.kv small { display: block; font-size: 0.72rem; color: var(--ink3); text-transform: uppercase; letter-spacing: 0.08em; font-family: var(--mono); }
+.kv b { font-family: var(--mono); font-weight: 500; font-size: 1.05rem; }
+.kv span { font-size: 0.78rem; color: var(--ink2); display: block; }
+.note { margin-top: 16px; font-size: 0.85rem; color: var(--ink2); max-width: 80ch; }
+.rank-wrap { --side: var(--accent); }
+.rank-wrap[data-side="bowl"] { --side: var(--blue); }
+
+/* explorer */
+.explorer { display: grid; grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr); gap: 24px; align-items: start; }
+.panel { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 20px; }
+.chart svg { width: 100%; height: auto; display: block; overflow: visible; }
+.chart text { fill: var(--ink2); font-family: var(--mono); font-size: 11px; }
+.chart .axis { stroke: var(--line); stroke-width: 1; }
+.chart .diag { stroke: var(--ink3); stroke-dasharray: 4 4; stroke-width: 1; }
+.pt { cursor: pointer; }
+.pt circle { transition: r 0.1s; }
+.tip { position: fixed; pointer-events: none; z-index: 40; background: var(--ink); color: var(--bg); font-size: 0.78rem; padding: 7px 10px; border-radius: 8px; max-width: 260px; opacity: 0; transition: opacity 0.1s; }
+.tip.on { opacity: 1; }
+.search { display: flex; gap: 8px; margin-bottom: 14px; }
+.search input { flex: 1; min-width: 0; font: 500 0.9rem var(--body); padding: 10px 12px; border: 1px solid var(--line); border-radius: 8px; background: var(--bg); color: var(--ink); }
+.pcard h3 { font-size: 1.5rem; margin-bottom: 4px; }
+.pcard .sub { color: var(--ink2); font-size: 0.85rem; margin-bottom: 16px; }
+.pcard .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px 18px; }
+.legend { display: flex; gap: 16px; flex-wrap: wrap; font-size: 0.8rem; color: var(--ink2); margin-top: 10px; }
+.legend i { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 6px; vertical-align: -1px; }
+
+/* pressure tiers */
+.tiers { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }
+.tier { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 16px; border-top: 4px solid color-mix(in srgb, var(--accent) var(--t), var(--surface2)); }
+.tier b { font-family: var(--display); font-stretch: 108%; font-size: 1.2rem; font-weight: 800; }
+.tier .rng { font-family: var(--mono); font-size: 0.78rem; color: var(--ink2); margin: 2px 0 10px; display: block; }
+.tier p { font-size: 0.85rem; color: var(--ink2); }
+.two { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 24px; margin-top: 24px; }
+.three { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; }
+.hero-grid > *, .explorer > *, .two > *, .three > *, .steps > *, .tiers > * { min-width: 0; }
+.formula.wrap { white-space: normal; }
+.formula { font-family: var(--mono); font-size: 0.85rem; background: var(--surface2); border-radius: 8px; padding: 12px 14px; overflow-x: auto; margin-top: 10px; white-space: nowrap; }
+
+/* method */
+.steps { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; counter-reset: s; }
+.step { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 18px; display: grid; gap: 8px; align-content: start; }
+.step .tagline { font-family: var(--mono); font-size: 0.7rem; letter-spacing: 0.1em; text-transform: uppercase; color: var(--accent); }
+.step p { font-size: 0.86rem; color: var(--ink2); }
+.step .big { font-family: var(--display); font-stretch: 108%; font-weight: 800; font-size: 1.7rem; }
+.calc button.o { appearance: none; border: 1px solid var(--line); background: var(--surface); color: var(--ink); font: 500 0.85rem var(--mono); padding: 8px 12px; border-radius: 8px; cursor: pointer; }
+.calc button.o[aria-pressed="true"] { background: var(--ink); color: var(--bg); border-color: var(--ink); }
+.calc .row { display: flex; gap: 8px; flex-wrap: wrap; margin: 8px 0 14px; }
+.calc .res { font-family: var(--display); font-stretch: 108%; font-size: 2.6rem; font-weight: 850; line-height: 1; }
+.calc .res.pos { color: var(--good); } .calc .res.neg { color: var(--bad); }
+
+/* evidence */
+.finding { display: grid; gap: 6px; background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 18px; }
+.finding .st { font-family: var(--mono); font-size: 0.7rem; letter-spacing: 0.1em; text-transform: uppercase; }
+.st.keep { color: var(--good); } .st.drop { color: var(--bad); } .st.note { color: var(--warn); }
+.finding p { font-size: 0.86rem; color: var(--ink2); }
+table { border-collapse: collapse; width: 100%; font-size: 0.85rem; }
+th, td { text-align: left; padding: 9px 10px; border-bottom: 1px solid var(--line); }
+th { font-family: var(--mono); font-size: 0.7rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--ink3); font-weight: 500; }
+td.num { text-align: right; } th.num { text-align: right; }
+.scroll { overflow-x: auto; }
+ul.limits { margin: 0; padding: 0; list-style: none; display: grid; gap: 10px; }
+ul.limits li { background: var(--surface); border: 1px solid var(--line); border-left: 4px solid var(--warn); border-radius: 8px; padding: 12px 16px; font-size: 0.9rem; }
+ul.limits b { font-weight: 600; }
+footer { border-top: 1px solid var(--line); padding-block: 32px 56px; color: var(--ink2); font-size: 0.85rem; }
+
+@media (max-width: 860px) {
+  .hero-grid, .explorer, .two { grid-template-columns: minmax(0, 1fr); }
+  .tiers, .steps { grid-template-columns: repeat(2, 1fr); }
+  .three { grid-template-columns: 1fr; }
+  .stats { grid-template-columns: repeat(2, 1fr); }
+  .stats div:nth-child(3) { border-left: 0; padding-left: 0; }
+  .rank summary { grid-template-columns: 34px minmax(0, 1fr) 20px; }
+  .rank summary .meter, .rank summary .chip { grid-column: 2 / 3; }
+  .rank summary .chev { grid-row: 1; grid-column: 3; }
+  .detail { padding-left: 16px; }
+  .top nav a:nth-child(n+5) { display: none; }
+}
+@media (max-width: 520px) { .tiers, .steps { grid-template-columns: 1fr; } .band { padding-block: 52px; } }
+@media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } * { transition: none !important; } }
+</style>
+
+<header class="top"><div class="wrap">
+  <div class="brand">Pressure <i>Ledger</i></div>
+  <nav aria-label="Sections"><a href="#rankings">Rankings</a><a href="#explorer">Explorer</a><a href="#pressure">Pressure</a><a href="#method">Method</a><a href="#evidence">Evidence</a><a href="#limits">Limits</a></nav>
+</div></header>
+
+<main>
+<section class="hero"><div class="wrap">
+  <div class="hero-grid">
+    <div>
+      <div class="eyebrow">SupeRR Selector Season 2 &middot; Round 1</div>
+      <h1 style="margin-top:14px">Who holds their nerve when the <em>match is on the line?</em></h1>
+      <p class="lede">We rated every IPL and T20I batter and bowler since 2022 on what they do in the highest-leverage balls, measured against what an average player does in the same situation.</p>
+    </div>
+    <div class="score" aria-label="Top of each list">
+      <header><span>Top of the ledger</span><span>runs / over above average</span></header>
+      <div id="heroRows"></div>
+    </div>
+  </div>
+  <div class="stats" id="stats"></div>
+</div></section>
+
+<section class="band" id="rankings"><div class="wrap">
+  <div class="band-head">
+    <div class="eyebrow">The answer</div>
+    <h2>Top 10 under pressure</h2>
+    <p class="lede">Rating is the estimated runs per over a player gains over an average player in the same match state, after adjusting for opponent, role and thin samples. Open a row for the evidence.</p>
+  </div>
+  <div class="bar-row">
+    <div class="toggle" role="group" aria-label="List"><button data-s="bat" aria-pressed="true">Batters</button><button data-s="bowl" aria-pressed="false">Bowlers</button></div>
+    <div class="legend"><span><i style="background:var(--good)"></i>Stays in top 10 in 75%+ of bootstrap runs</span><span><i style="background:var(--warn)"></i>50 to 75%</span><span><i style="background:var(--bad)"></i>Under 50%: edge of the list</span></div>
+  </div>
+  <div class="rank-wrap" id="rankWrap" data-side="bat"><ol class="rank" id="rankList"></ol></div>
+  <p class="note" id="rankNote"></p>
+</div></section>
+
+<section class="band" id="explorer"><div class="wrap">
+  <div class="band-head">
+    <div class="eyebrow">All 185 eligible players</div>
+    <h2>Pressure versus ordinary</h2>
+    <p class="lede" id="expLede"></p>
+  </div>
+  <div class="bar-row">
+    <div class="toggle" role="group" aria-label="Player type"><button data-s="bat" aria-pressed="true">Batters</button><button data-s="bowl" aria-pressed="false">Bowlers</button></div>
+  </div>
+  <div class="explorer">
+    <div class="panel chart"><svg id="scatter" viewBox="0 0 640 440" role="img" aria-label="Scatter of pressure versus ordinary performance for every eligible player"></svg>
+      <div class="legend"><span><i style="background:var(--accent)" id="lgTop"></i>Top 10</span><span><i style="background:var(--ink3)"></i>Other eligible players</span><span id="lgHint"></span></div></div>
+    <div class="panel pcard">
+      <div class="search"><input id="pSearch" list="pList" placeholder="Search a player" aria-label="Search a player"><datalist id="pList"></datalist></div>
+      <div id="pCard"></div>
+    </div>
+  </div>
+</div></section>
+
+<section class="band" id="pressure"><div class="wrap">
+  <div class="band-head">
+    <div class="eyebrow">Definition</div>
+    <h2>Pressure is how much the next ball can swing the match</h2>
+    <p class="lede">Required rate, wickets in hand and overs left interact: 12 an over is routine with eight wickets in hand and desperate with three. So we let a win-probability model combine them, then measure how much each ball can move it.</p>
+  </div>
+  <div class="steps" style="grid-template-columns:repeat(3,minmax(0,1fr))">
+    <div class="step"><span class="tagline">Model</span><div class="big mono" id="auc2"></div><p>Out-of-fold AUC for chases. Every ball is scored by a model that never saw its match. First innings reaches 0.68, so those balls count at half weight.</p></div>
+    <div class="step"><span class="tagline">Leverage</span><div class="big">Expected swing</div><p>Apply each outcome (dot, 1 to 6, wicket) weighted by how often it happens in that phase, and average the absolute change in win probability.</p></div>
+    <div class="step"><span class="tagline">Live balls only</span><div class="big">3% to 97%</div><p>Balls where the game is already decided are excluded from ratings. Among the rest, leverage is ranked within each innings and cut into four tiers.</p></div>
+  </div>
+  <div class="two">
+    <div class="panel chart">
+      <h3>Where the pressure sits in a chase</h3>
+      <p class="muted" style="font-size:.85rem;margin:6px 0 12px">Average win-probability swing of the next ball, by over and the chasing side's win probability. Hover a cell.</p>
+      <svg id="heat" viewBox="0 0 560 270" role="img" aria-label="Heat map of leverage by over and chasing side win probability"></svg>
+    </div>
+    <div class="panel chart">
+      <div class="bar-row" style="margin-bottom:6px"><h3>Pressure changes how innings go</h3>
+        <div class="toggle" role="group" aria-label="Metric" id="tierToggle"><button data-m="dot" aria-pressed="true">Dots</button><button data-m="wkt" aria-pressed="false">Wickets</button><button data-m="bdy" aria-pressed="false">Boundaries</button></div></div>
+      <p class="muted" style="font-size:.85rem;margin-bottom:10px">Share of legal deliveries, league-wide, by pressure tier.</p>
+      <svg id="tierChart" viewBox="0 0 520 250" role="img" aria-label="Outcome rates by pressure tier"></svg>
+    </div>
+  </div>
+  <div class="tiers" style="margin-top:24px" id="tierCards"></div>
+  <div class="two">
+    <div class="panel"><h3>Pressure has a direction</h3>
+      <p class="muted" style="margin-top:8px;font-size:.9rem">A batter is more pressured when his side is behind, a bowler when the batting side is ahead. A 50-50 game weighs both equally.</p>
+      <div class="formula">batter weight = 0.6 + 0.8 &times; (1 &minus; win prob)<br>bowler weight = 0.6 + 0.8 &times; win prob</div></div>
+    <div class="panel"><h3>Four tiers, one rule</h3>
+      <p class="muted" style="margin-top:8px;font-size:.9rem">Leverage percentile within each innings, among live balls. Ratings weight balls by intensity, so High and Extreme balls drive the estimate, while Ordinary and Elevated balls anchor each player's usual level.</p></div>
+  </div>
+</div></section>
+
+<section class="band" id="method"><div class="wrap">
+  <div class="band-head">
+    <div class="eyebrow">Scoring</div>
+    <h2>Every ball is scored against its own situation</h2>
+    <p class="lede">Win probability only defines pressure. Players are scored in runs, because run value predicted next-season form where win-probability credit did not.</p>
+  </div>
+  <div class="steps">
+    <div class="step"><span class="tagline">1 &middot; Expect</span><div class="big">State models</div><p>Gradient-boosted models predict the runs, the wicket chance and the cost of a wicket for an average player in the same state: overs, wickets, target.</p></div>
+    <div class="step"><span class="tagline">2 &middot; Value</span><div class="big">V per ball</div><p>Runs above expected, minus the expected-runs cost of any wicket above its expected chance.</p></div>
+    <div class="step"><span class="tagline">3 &middot; Rate</span><div class="big">Crossed ridge</div><p>One model explains V with a batter effect and a bowler effect, plus batting slot and pace/spin. It controls for opponent and shrinks thin samples.</p></div>
+    <div class="step"><span class="tagline">4 &middot; Check</span><div class="big">Bootstrap</div><p>100 resamples of matches rerun the whole pipeline to give each player a probability of staying in the top 10.</p></div>
+  </div>
+  <div class="two">
+    <div class="panel calc">
+      <h3>Value of one ball</h3>
+      <p class="muted" style="font-size:.85rem;margin-top:6px">League-average expectations from this data. Pick a phase and an outcome.</p>
+      <div class="row" id="phBtns" role="group" aria-label="Phase"></div>
+      <div class="row" id="ouBtns" role="group" aria-label="Outcome"></div>
+      <div class="formula wrap" id="calcF"></div>
+      <div style="margin-top:14px"><div class="res" id="calcR"></div><div class="muted" id="calcT" style="font-size:.85rem;margin-top:4px"></div></div>
+    </div>
+    <div class="panel"><h3>What goes into the rating</h3>
+      <div style="margin-top:12px;display:grid;gap:10px;font-size:.9rem">
+        <div><b>Opponent.</b> <span class="muted">A batter is credited relative to the bowlers he faced, and a bowler relative to the batters he bowled to.</span></div>
+        <div><b>Role.</b> <span class="muted">Batting slot (1-2, 3-4, 5-6, 7+) and pace versus spin are controlled for.</span></div>
+        <div><b>Competition.</b> <span class="muted">Emerging Teams and Rising Stars matches count at half weight.</span></div>
+        <div><b>Exclusions.</b> <span class="muted">Rain-affected matches, ties, no-results, super overs, run-outs and retirements.</span></div>
+        <div><b>Shrinkage.</b> <span class="muted">Ridge penalties pull thin-sample players toward average. The typical player has only 15 to 25 balls in the top tiers.</span></div>
+      </div>
+      <div class="formula">rating = baseline + shrunk pressure slope</div>
+    </div>
+  </div>
+</div></section>
+
+<section class="band" id="evidence"><div class="wrap">
+  <div class="band-head">
+    <div class="eyebrow">Evidence</div>
+    <h2>We tested what predicts pressure performance we hadn't seen</h2>
+    <p class="lede">Fit on half the matches, then check how well each score ranks players on pressure balls in the other half. Ten random splits, plus one chronological test (fit on 2022 to 2024, test on 2025 to 2026).</p>
+  </div>
+  <div class="bar-row">
+    <div class="toggle" role="group" aria-label="List" id="evSide"><button data-s="bat" aria-pressed="true">Batters</button><button data-s="bowl" aria-pressed="false">Bowlers</button></div>
+    <div class="toggle" role="group" aria-label="Tier" id="evTier"><button data-t="Elev+" aria-pressed="true">Elevated + High + Extreme</button><button data-t="High+" aria-pressed="false">High + Extreme only</button></div>
+  </div>
+  <div class="panel chart"><svg id="evChart" viewBox="0 0 700 270" role="img" aria-label="Held-out rank correlation by score"></svg>
+    <div class="legend"><span><i style="background:var(--ink2);border-radius:2px"></i>Average over 10 random splits</span><span><span style="display:inline-block;width:9px;height:9px;background:var(--warn);transform:rotate(45deg);margin-right:7px"></span>Chronological test</span><span id="evN"></span></div></div>
+  <div class="three" style="margin-top:20px">
+    <div class="finding"><span class="st keep">Kept</span><h3>Baseline skill on pressure-weighted balls</h3><p>The only signal that predicted held-out pressure results. Adjusted for opponent and role, and shrunk for small samples.</p></div>
+    <div class="finding"><span class="st drop">Dropped</span><h3>Pressure slope and hit-rate</h3><p>Change from a player's own baseline and match-by-match hit rate did not predict held-out results, so neither drives the ranking. Both are shown as diagnostics.</p></div>
+    <div class="finding"><span class="st drop">Dropped</span><h3>Win-probability credit as the score</h3><p>It drifted by &minus;1.0 points per 100 balls in the Extreme tier and barely persisted across seasons (&rho; about 0.1 for batters).</p></div>
+  </div>
+  <div class="two">
+    <div class="panel chart"><div class="bar-row" style="margin-bottom:4px"><h3>How often each player stays in the top 10</h3></div>
+      <p class="muted" style="font-size:.85rem;margin-bottom:10px">Share of 100 match-level bootstrap runs. Top 15 shown for the selected list above.</p>
+      <svg id="stab" viewBox="0 0 520 380" role="img" aria-label="Bootstrap top-10 probability"></svg></div>
+    <div class="panel"><h3>Sensitivity of the top 10</h3>
+      <p class="muted" style="font-size:.85rem;margin:6px 0 12px">Names unchanged out of 10 when one setting changes.</p>
+      <div class="scroll"><table><thead><tr><th>Change</th><th class="num">Batters</th><th class="num">Bowlers</th></tr></thead><tbody id="sensBody"></tbody></table></div></div>
+  </div>
+</div></section>
+
+<section class="band" id="limits"><div class="wrap">
+  <div class="band-head">
+    <div class="eyebrow">Read with care</div>
+    <h2>Where the model is less certain</h2>
+  </div>
+  <ul class="limits">
+    <li><b>Pressure-specific skill is hard to detect.</b> Only baseline skill predicted future pressure results, so the ranking rests on that. We do not claim a measurable clutch gene.</li>
+    <li><b>Batters in the top tiers are the least predictable.</b> Held-out correlation for batters in the High and Extreme tiers is near zero (+0.02). Read batter order within the top 10 as a tier. Bowlers are more reliable (+0.12).</li>
+    <li><b>Thin samples at the edge.</b> Several players have fewer than 80 pressure balls. Shrinkage and the bootstrap account for it, but a few more matches could move them. Places 8 to 10 in both lists are close calls.</li>
+    <li><b>First-innings pressure is approximate.</b> The first-innings win-probability model is weaker (AUC 0.68), so those balls count at half weight.</li>
+    <li><b>Missing context.</b> Pitch, dew, partnerships and batting-order decisions are not modelled. Players who appear in only one competition are linked to others through shared opponents.</li>
+    <li><b>Settings were tuned on this data.</b> Sensitivity checks show the effect is modest, but the final lists are not independently validated.</li>
+  </ul>
+</div></section>
+</main>
+
+<footer><div class="wrap"><div id="foot"></div>
+  <p style="margin-top:8px">Built for the Rajasthan Royals SupeRR Selector Season 2 hackathon. An independent student submission, not an official Rajasthan Royals product.</p></div></footer>
+<div class="tip" id="tip" role="tooltip"></div>
+
+<script type="application/json" id="data">{"meta":{"matches":818,"balls":195124,"ipl":387,"t20i":431,"first":"2022-01-22","last":"2026-11-01"},"bat":[{"id":50284,"name":"Vaibhav Sooryavanshi","rank":1,"rating":2.55,"z":4.22,"z10":2.39,"z90":4.3,"pt10":0.99,"medrank":1.0,"pb":73,"pm":21,"cons":0.75,"last":"2026-10-27","naive":1,"p":234.2,"o":232.4,"bdy":41.1,"out":1.4,"rae":7.74},{"id":4260,"name":"Heinrich Klaasen","rank":2,"rating":1.62,"z":2.38,"z10":1.31,"z90":2.69,"pt10":0.93,"medrank":3.0,"pb":110,"pm":33,"cons":0.65,"last":"2026-05-27","naive":7,"p":179.1,"o":164.6,"bdy":23.6,"out":4.5,"rae":1.62},{"id":6281,"name":"Abhishek Sharma","rank":3,"rating":1.56,"z":2.27,"z10":1.03,"z90":2.86,"pt10":0.84,"medrank":4.0,"pb":229,"pm":75,"cons":0.63,"last":"2026-11-01","naive":15,"p":167.7,"o":198.1,"bdy":27.9,"out":7.4,"rae":1.39},{"id":6396,"name":"Tim David","rank":4,"rating":1.5,"z":2.14,"z10":0.87,"z90":2.53,"pt10":0.77,"medrank":5.0,"pb":132,"pm":33,"cons":0.57,"last":"2026-06-19","naive":4,"p":186.4,"o":173.8,"bdy":25.0,"out":3.0,"rae":2.41},{"id":5553,"name":"Phil Salt","rank":5,"rating":1.32,"z":1.79,"z10":0.85,"z90":2.18,"pt10":0.75,"medrank":6.0,"pb":101,"pm":42,"cons":0.72,"last":"2026-07-11","naive":3,"p":190.1,"o":172.5,"bdy":33.7,"out":6.9,"rae":1.81},{"id":1318,"name":"Andre Russell","rank":6,"rating":1.19,"z":1.53,"z10":0.59,"z90":2.13,"pt10":0.62,"medrank":8.0,"pb":74,"pm":21,"cons":0.72,"last":"2025-07-22","naive":20,"p":164.9,"o":173.2,"bdy":23.0,"out":5.4,"rae":1.87},{"id":1699,"name":"Suryakumar Yadav","rank":7,"rating":1.17,"z":1.48,"z10":0.75,"z90":1.78,"pt10":0.63,"medrank":9.0,"pb":176,"pm":59,"cons":0.54,"last":"2026-05-24","naive":47,"p":145.5,"o":168.9,"bdy":19.9,"out":5.1,"rae":0.55},{"id":8101,"name":"Ashutosh Sharma","rank":8,"rating":1.11,"z":1.37,"z10":0.23,"z90":2.06,"pt10":0.4,"medrank":13.5,"pb":46,"pm":12,"cons":0.43,"last":"2026-05-24","naive":2,"p":213.0,"o":164.6,"bdy":30.4,"out":4.3,"rae":3.25},{"id":6819,"name":"Yashasvi Jaiswal","rank":9,"rating":0.96,"z":1.07,"z10":0.08,"z90":1.55,"pt10":0.35,"medrank":15.0,"pb":136,"pm":50,"cons":0.65,"last":"2026-05-29","naive":24,"p":161.0,"o":154.0,"bdy":28.7,"out":5.9,"rae":1.56},{"id":4736,"name":"Josh Inglis","rank":10,"rating":0.94,"z":1.03,"z10":-0.07,"z90":1.83,"pt10":0.39,"medrank":15.0,"pb":73,"pm":26,"cons":0.62,"last":"2026-06-19","naive":28,"p":160.3,"o":169.6,"bdy":24.7,"out":6.8,"rae":0.85},{"id":2258,"name":"Sanju Samson","rank":11,"rating":0.93,"z":1.0,"z10":0.1,"z90":1.55,"pt10":0.26,"medrank":16.0,"pb":189,"pm":67,"cons":0.66,"last":"2026-11-01","naive":18,"p":165.6,"o":157.7,"bdy":28.0,"out":4.2,"rae":2.18},{"id":6423,"name":"Riyan Parag","rank":12,"rating":0.92,"z":0.99,"z10":0.23,"z90":1.39,"pt10":0.22,"medrank":15.0,"pb":61,"pm":23,"cons":0.59,"last":"2026-05-29","naive":19,"p":165.6,"o":145.9,"bdy":24.6,"out":6.6,"rae":1.21},{"id":3125,"name":"Nicholas Pooran","rank":13,"rating":0.8,"z":0.76,"z10":-0.04,"z90":1.44,"pt10":0.26,"medrank":17.0,"pb":127,"pm":49,"cons":0.56,"last":"2026-05-23","naive":26,"p":160.6,"o":168.6,"bdy":25.2,"out":5.5,"rae":0.86},{"id":4847,"name":"Finn Allen","rank":14,"rating":0.79,"z":0.73,"z10":-0.13,"z90":1.36,"pt10":0.2,"medrank":22.0,"pb":107,"pm":33,"cons":0.62,"last":"2026-11-01","naive":66,"p":129.9,"o":186.7,"bdy":22.4,"out":7.5,"rae":-1.46},{"id":2367,"name":"Travis Head","rank":15,"rating":0.78,"z":0.71,"z10":-0.12,"z90":1.38,"pt10":0.21,"medrank":18.0,"pb":132,"pm":41,"cons":0.63,"last":"2026-05-27","naive":17,"p":165.9,"o":182.9,"bdy":28.8,"out":5.3,"rae":0.43},{"id":4722,"name":"Rashid Khan","rank":16,"rating":0.78,"z":0.71,"z10":-0.2,"z90":1.34,"pt10":0.23,"medrank":21.0,"pb":61,"pm":22,"cons":0.55,"last":"2026-10-29","naive":9,"p":175.4,"o":141.8,"bdy":26.2,"out":9.8,"rae":1.06},{"id":4708,"name":"Rinku Singh","rank":17,"rating":0.76,"z":0.68,"z10":-0.12,"z90":1.02,"pt10":0.08,"medrank":26.0,"pb":96,"pm":32,"cons":0.65,"last":"2026-07-26","naive":14,"p":167.7,"o":153.0,"bdy":21.9,"out":4.2,"rae":1.39},{"id":1107,"name":"Mohammad Nabi","rank":18,"rating":0.76,"z":0.67,"z10":-0.12,"z90":1.2,"pt10":0.14,"medrank":22.0,"pb":77,"pm":21,"cons":0.56,"last":"2026-09-15","naive":38,"p":153.2,"o":123.7,"bdy":19.5,"out":2.6,"rae":1.82},{"id":7897,"name":"Namboori Tilak Varma","rank":19,"rating":0.75,"z":0.66,"z10":0.07,"z90":1.09,"pt10":0.07,"medrank":25.0,"pb":175,"pm":54,"cons":0.56,"last":"2026-11-01","naive":44,"p":148.0,"o":148.4,"bdy":20.0,"out":4.0,"rae":0.57},{"id":4904,"name":"Kamindu Mendis","rank":20,"rating":0.74,"z":0.63,"z10":-0.15,"z90":1.46,"pt10":0.23,"medrank":19.0,"pb":63,"pm":17,"cons":0.55,"last":"2026-10-13","naive":29,"p":158.7,"o":120.3,"bdy":22.2,"out":3.2,"rae":2.11},{"id":4106,"name":"Daryl Mitchell","rank":21,"rating":0.69,"z":0.54,"z10":-0.07,"z90":1.0,"pt10":0.09,"medrank":25.5,"pb":82,"pm":26,"cons":0.8,"last":"2026-11-01","naive":25,"p":161.0,"o":141.7,"bdy":17.1,"out":1.2,"rae":2.61},{"id":5939,"name":"Cameron Green","rank":22,"rating":0.69,"z":0.53,"z10":-0.3,"z90":1.12,"pt10":0.1,"medrank":30.5,"pb":86,"pm":28,"cons":0.49,"last":"2026-05-24","naive":27,"p":160.5,"o":152.2,"bdy":23.3,"out":5.8,"rae":0.12},{"id":3647,"name":"Shreyas Iyer","rank":23,"rating":0.68,"z":0.51,"z10":-0.26,"z90":1.14,"pt10":0.1,"medrank":27.0,"pb":159,"pm":45,"cons":0.66,"last":"2026-11-01","naive":8,"p":178.0,"o":148.9,"bdy":25.2,"out":4.4,"rae":2.01},{"id":818,"name":"Mitchell Marsh","rank":24,"rating":0.66,"z":0.48,"z10":-0.36,"z90":1.08,"pt10":0.08,"medrank":31.5,"pb":148,"pm":44,"cons":0.53,"last":"2026-06-21","naive":77,"p":123.6,"o":158.7,"bdy":17.6,"out":2.7,"rae":0.45},{"id":4986,"name":"Rovman Powell","rank":25,"rating":0.65,"z":0.45,"z10":-0.23,"z90":1.06,"pt10":0.09,"medrank":27.0,"pb":113,"pm":41,"cons":0.42,"last":"2026-10-14","naive":31,"p":158.4,"o":145.6,"bdy":18.6,"out":9.7,"rae":0.05},{"id":838,"name":"Glenn Maxwell","rank":26,"rating":0.64,"z":0.44,"z10":-0.54,"z90":1.1,"pt10":0.12,"medrank":27.0,"pb":84,"pm":22,"cons":0.64,"last":"2025-11-06","naive":51,"p":144.0,"o":166.0,"bdy":22.6,"out":3.6,"rae":0.68},{"id":6726,"name":"Romario Shepherd","rank":27,"rating":0.64,"z":0.43,"z10":-0.27,"z90":1.11,"pt10":0.09,"medrank":27.0,"pb":88,"pm":24,"cons":0.54,"last":"2026-10-09","naive":40,"p":151.1,"o":184.5,"bdy":21.6,"out":9.1,"rae":0.98},{"id":768,"name":"Reeza Hendricks","rank":28,"rating":0.61,"z":0.38,"z10":-0.19,"z90":1.07,"pt10":0.07,"medrank":29.5,"pb":66,"pm":17,"cons":0.4,"last":"2025-12-19","naive":73,"p":125.8,"o":149.5,"bdy":18.2,"out":6.1,"rae":-0.9},{"id":4853,"name":"Glenn Phillips","rank":29,"rating":0.59,"z":0.35,"z10":-0.25,"z90":0.82,"pt10":0.05,"medrank":30.0,"pb":68,"pm":25,"cons":0.64,"last":"2026-11-01","naive":62,"p":133.8,"o":149.0,"bdy":19.1,"out":2.9,"rae":1.5},{"id":143,"name":"Dinesh Karthik","rank":30,"rating":0.59,"z":0.35,"z10":-0.41,"z90":1.07,"pt10":0.08,"medrank":28.0,"pb":59,"pm":24,"cons":0.56,"last":"2024-05-22","naive":6,"p":181.4,"o":168.4,"bdy":27.1,"out":6.8,"rae":0.39},{"id":7216,"name":"Prabhsimran Singh","rank":31,"rating":0.59,"z":0.34,"z10":-0.38,"z90":1.05,"pt10":0.08,"medrank":32.0,"pb":107,"pm":34,"cons":0.7,"last":"2026-05-23","naive":16,"p":167.3,"o":167.6,"bdy":30.8,"out":4.7,"rae":1.75},{"id":4007,"name":"Ryan Rickelton","rank":32,"rating":0.54,"z":0.24,"z10":-0.47,"z90":0.92,"pt10":0.07,"medrank":32.5,"pb":64,"pm":23,"cons":0.66,"last":"2026-05-24","naive":12,"p":171.9,"o":166.4,"bdy":31.2,"out":7.8,"rae":2.18},{"id":953,"name":"Lokesh Rahul","rank":33,"rating":0.53,"z":0.23,"z10":-0.39,"z90":0.72,"pt10":0.02,"medrank":37.0,"pb":176,"pm":45,"cons":0.51,"last":"2026-05-24","naive":55,"p":137.5,"o":144.3,"bdy":18.2,"out":2.3,"rae":1.23},{"id":813,"name":"Jos Buttler","rank":34,"rating":0.53,"z":0.22,"z10":-0.47,"z90":0.8,"pt10":0.01,"medrank":35.5,"pb":192,"pm":66,"cons":0.55,"last":"2026-09-19","naive":48,"p":145.3,"o":159.5,"bdy":21.4,"out":3.6,"rae":1.01},{"id":6288,"name":"Shubman Gill","rank":35,"rating":0.52,"z":0.2,"z10":-0.41,"z90":0.76,"pt10":0.01,"medrank":36.0,"pb":172,"pm":61,"cons":0.56,"last":"2026-05-31","naive":39,"p":152.3,"o":151.5,"bdy":22.7,"out":5.2,"rae":0.88},{"id":3916,"name":"Jitesh Sharma","rank":36,"rating":0.51,"z":0.18,"z10":-0.52,"z90":0.73,"pt10":0.03,"medrank":39.0,"pb":86,"pm":28,"cons":0.33,"last":"2026-05-31","naive":79,"p":123.3,"o":171.6,"bdy":16.3,"out":3.5,"rae":0.19},{"id":4755,"name":"Shivam Dube","rank":37,"rating":0.51,"z":0.17,"z10":-0.51,"z90":0.74,"pt10":0.02,"medrank":36.0,"pb":111,"pm":37,"cons":0.54,"last":"2026-10-09","naive":30,"p":158.6,"o":160.4,"bdy":21.6,"out":4.5,"rae":0.86},{"id":2921,"name":"Fakhar Zaman","rank":38,"rating":0.48,"z":0.12,"z10":-0.56,"z90":0.98,"pt10":0.07,"medrank":38.5,"pb":67,"pm":25,"cons":0.58,"last":"2026-10-13","naive":34,"p":156.7,"o":133.2,"bdy":22.4,"out":6.0,"rae":2.53},{"id":2490,"name":"Mohammad Nawaz","rank":39,"rating":0.47,"z":0.11,"z10":-0.52,"z90":0.69,"pt10":0.01,"medrank":39.0,"pb":53,"pm":17,"cons":0.58,"last":"2026-02-01","naive":13,"p":171.7,"o":132.6,"bdy":24.5,"out":3.8,"rae":1.53},{"id":20702,"name":"Tristan Stubbs","rank":40,"rating":0.47,"z":0.1,"z10":-0.67,"z90":0.65,"pt10":0.02,"medrank":37.0,"pb":72,"pm":27,"cons":0.55,"last":"2026-05-24","naive":23,"p":161.1,"o":143.7,"bdy":19.4,"out":2.8,"rae":0.73},{"id":1077,"name":"David Miller","rank":41,"rating":0.45,"z":0.06,"z10":-0.7,"z90":0.66,"pt10":0.02,"medrank":40.0,"pb":115,"pm":34,"cons":0.57,"last":"2026-05-24","naive":21,"p":163.5,"o":152.1,"bdy":19.1,"out":2.6,"rae":0.71},{"id":1205,"name":"Jonny Bairstow","rank":42,"rating":0.43,"z":0.02,"z10":-0.84,"z90":1.09,"pt10":0.08,"medrank":41.0,"pb":50,"pm":13,"cons":0.62,"last":"2025-06-01","naive":37,"p":154.0,"o":147.8,"bdy":22.0,"out":4.0,"rae":0.35},{"id":2436,"name":"Dasun Shanaka","rank":43,"rating":0.43,"z":0.02,"z10":-0.69,"z90":0.49,"pt10":0.0,"medrank":45.5,"pb":127,"pm":28,"cons":0.49,"last":"2026-10-09","naive":32,"p":158.3,"o":138.2,"bdy":19.7,"out":5.5,"rae":0.16},{"id":6931,"name":"Pathum Nissanka","rank":44,"rating":0.41,"z":-0.03,"z10":-0.69,"z90":0.68,"pt10":0.01,"medrank":41.0,"pb":131,"pm":38,"cons":0.47,"last":"2026-09-19","naive":54,"p":138.2,"o":136.6,"bdy":19.8,"out":5.3,"rae":0.19},{"id":4409,"name":"Sam Curran","rank":45,"rating":0.36,"z":-0.12,"z10":-0.76,"z90":0.66,"pt10":0.01,"medrank":48.5,"pb":71,"pm":22,"cons":0.55,"last":"2026-07-07","naive":63,"p":133.8,"o":129.5,"bdy":15.5,"out":2.8,"rae":0.33},{"id":6059,"name":"Ruturaj Gaikwad","rank":46,"rating":0.34,"z":-0.17,"z10":-0.69,"z90":0.51,"pt10":0.01,"medrank":46.0,"pb":131,"pm":48,"cons":0.47,"last":"2026-05-21","naive":87,"p":100.8,"o":143.8,"bdy":10.7,"out":0.8,"rae":-0.29},{"id":2876,"name":"Axar Patel","rank":47,"rating":0.33,"z":-0.18,"z10":-0.89,"z90":0.41,"pt10":0.0,"medrank":50.0,"pb":120,"pm":40,"cons":0.47,"last":"2026-10-24","naive":75,"p":125.0,"o":135.8,"bdy":13.3,"out":6.7,"rae":-1.31},{"id":4369,"name":"Shai Hope","rank":48,"rating":0.33,"z":-0.18,"z10":-0.74,"z90":0.58,"pt10":0.01,"medrank":46.0,"pb":83,"pm":29,"cons":0.71,"last":"2026-10-14","naive":42,"p":149.4,"o":151.0,"bdy":20.5,"out":2.4,"rae":2.65},{"id":2101,"name":"Quinton de Kock","rank":49,"rating":0.28,"z":-0.27,"z10":-1.2,"z90":0.45,"pt10":0.01,"medrank":50.5,"pb":96,"pm":31,"cons":0.61,"last":"2026-04-23","naive":45,"p":147.9,"o":152.7,"bdy":25.0,"out":4.2,"rae":0.45},{"id":3297,"name":"Shimron Hetmyer","rank":50,"rating":0.28,"z":-0.28,"z10":-0.88,"z90":0.63,"pt10":0.02,"medrank":49.5,"pb":98,"pm":35,"cons":0.51,"last":"2026-10-14","naive":10,"p":174.5,"o":145.5,"bdy":24.5,"out":6.1,"rae":0.55},{"id":23450,"name":"Sai Sudharsan","rank":51,"rating":0.27,"z":-0.31,"z10":-0.69,"z90":0.18,"pt10":0.0,"medrank":51.5,"pb":109,"pm":29,"cons":0.51,"last":"2026-05-31","naive":61,"p":133.9,"o":149.0,"bdy":18.3,"out":1.8,"rae":0.52},{"id":47,"name":"Virat Kohli","rank":52,"rating":0.26,"z":-0.31,"z10":-1.04,"z90":0.34,"pt10":0.02,"medrank":53.0,"pb":207,"pm":56,"cons":0.49,"last":"2026-05-31","naive":71,"p":126.6,"o":148.3,"bdy":18.8,"out":3.9,"rae":-0.47},{"id":3648,"name":"Deepak Hooda","rank":53,"rating":0.26,"z":-0.32,"z10":-0.82,"z90":0.3,"pt10":0.0,"medrank":52.0,"pb":61,"pm":26,"cons":0.56,"last":"2025-04-30","naive":46,"p":145.9,"o":143.8,"bdy":19.7,"out":9.8,"rae":0.73},{"id":220,"name":"David Warner","rank":54,"rating":0.26,"z":-0.32,"z10":-0.94,"z90":0.35,"pt10":0.0,"medrank":52.0,"pb":74,"pm":25,"cons":0.61,"last":"2024-05-12","naive":35,"p":155.4,"o":144.2,"bdy":21.6,"out":2.7,"rae":2.75},{"id":88,"name":"Faf du Plessis","rank":55,"rating":0.25,"z":-0.34,"z10":-1.04,"z90":0.43,"pt10":0.0,"medrank":52.0,"pb":112,"pm":32,"cons":0.49,"last":"2025-05-24","naive":55,"p":137.5,"o":157.9,"bdy":20.5,"out":5.4,"rae":-0.17},{"id":24017,"name":"Brian Bennett","rank":56,"rating":0.22,"z":-0.39,"z10":-0.84,"z90":0.31,"pt10":0.0,"medrank":59.0,"pb":69,"pm":27,"cons":0.61,"last":"2026-11-01","naive":69,"p":127.5,"o":135.7,"bdy":21.7,"out":10.1,"rae":-0.11},{"id":8,"name":"Mahendra Singh Dhoni","rank":57,"rating":0.22,"z":-0.4,"z10":-1.17,"z90":0.49,"pt10":0.0,"medrank":52.0,"pb":57,"pm":17,"cons":0.52,"last":"2025-05-20","naive":52,"p":140.4,"o":141.9,"bdy":19.3,"out":7.0,"rae":-1.42},{"id":2984,"name":"Sikandar Raza","rank":58,"rating":0.21,"z":-0.41,"z10":-0.99,"z90":0.13,"pt10":0.0,"medrank":56.0,"pb":96,"pm":27,"cons":0.49,"last":"2026-11-01","naive":72,"p":126.0,"o":128.0,"bdy":14.6,"out":8.3,"rae":-0.32},{"id":2463,"name":"Ryan Burl","rank":59,"rating":0.2,"z":-0.42,"z10":-0.87,"z90":0.2,"pt10":0.0,"medrank":55.0,"pb":71,"pm":18,"cons":0.58,"last":"2026-11-01","naive":86,"p":101.4,"o":122.9,"bdy":11.3,"out":4.2,"rae":-0.85},{"id":4117,"name":"Ishan Kishan","rank":60,"rating":0.19,"z":-0.45,"z10":-1.14,"z90":0.22,"pt10":0.0,"medrank":53.5,"pb":223,"pm":68,"cons":0.51,"last":"2026-11-01","naive":58,"p":136.3,"o":152.9,"bdy":21.5,"out":2.7,"rae":0.28},{"id":7544,"name":"Venkatesh Iyer","rank":61,"rating":0.18,"z":-0.47,"z10":-1.3,"z90":0.27,"pt10":0.02,"medrank":59.5,"pb":93,"pm":32,"cons":0.49,"last":"2026-05-31","naive":68,"p":128.0,"o":151.1,"bdy":17.2,"out":5.4,"rae":-1.27},{"id":4823,"name":"Washington Sundar","rank":62,"rating":0.17,"z":-0.49,"z10":-0.9,"z90":0.3,"pt10":0.0,"medrank":54.5,"pb":55,"pm":18,"cons":0.38,"last":"2026-07-09","naive":65,"p":130.9,"o":133.7,"bdy":16.4,"out":7.3,"rae":-0.62},{"id":4391,"name":"Liam Livingstone","rank":63,"rating":0.16,"z":-0.52,"z10":-1.29,"z90":0.33,"pt10":0.0,"medrank":61.0,"pb":71,"pm":34,"cons":0.66,"last":"2026-04-18","naive":49,"p":145.1,"o":151.0,"bdy":16.9,"out":9.9,"rae":0.01},{"id":2639,"name":"Marcus Stoinis","rank":64,"rating":0.14,"z":-0.54,"z10":-1.05,"z90":0.13,"pt10":0.0,"medrank":61.5,"pb":100,"pm":35,"cons":0.56,"last":"2026-05-17","naive":53,"p":139.0,"o":157.9,"bdy":15.0,"out":6.0,"rae":0.59},{"id":4703,"name":"Rishabh Pant","rank":65,"rating":0.13,"z":-0.58,"z10":-1.13,"z90":0.07,"pt10":0.01,"medrank":63.0,"pb":89,"pm":33,"cons":0.54,"last":"2026-05-23","naive":82,"p":113.5,"o":146.0,"bdy":16.9,"out":6.7,"rae":-1.45},{"id":3330,"name":"Hardik Pandya","rank":66,"rating":0.09,"z":-0.66,"z10":-0.96,"z90":0.02,"pt10":0.0,"medrank":60.5,"pb":127,"pm":45,"cons":0.63,"last":"2026-05-24","naive":11,"p":172.4,"o":139.7,"bdy":24.4,"out":0.8,"rae":1.86},{"id":6460,"name":"Ayush Badoni","rank":67,"rating":0.09,"z":-0.66,"z10":-1.03,"z90":-0.03,"pt10":0.0,"medrank":60.0,"pb":77,"pm":26,"cons":0.54,"last":"2026-05-23","naive":57,"p":136.4,"o":139.0,"bdy":18.2,"out":5.2,"rae":-0.63},{"id":152,"name":"Ravindra Jadeja","rank":68,"rating":0.08,"z":-0.67,"z10":-1.03,"z90":-0.04,"pt10":0.0,"medrank":61.5,"pb":77,"pm":26,"cons":0.66,"last":"2026-05-29","naive":33,"p":157.1,"o":133.0,"bdy":20.8,"out":3.9,"rae":0.93},{"id":7260,"name":"Dhruv Jurel","rank":69,"rating":0.02,"z":-0.79,"z10":-1.23,"z90":-0.07,"pt10":0.0,"medrank":68.5,"pb":77,"pm":19,"cons":0.54,"last":"2026-05-29","naive":5,"p":184.4,"o":155.5,"bdy":27.3,"out":6.5,"rae":1.38},{"id":167,"name":"Ajinkya Rahane","rank":70,"rating":0.0,"z":-0.82,"z10":-1.28,"z90":0.03,"pt10":0.0,"medrank":65.5,"pb":85,"pm":27,"cons":0.62,"last":"2026-05-24","naive":70,"p":127.1,"o":143.8,"bdy":17.6,"out":4.7,"rae":-0.17},{"id":3024,"name":"Mohammad Rizwan","rank":71,"rating":-0.01,"z":-0.84,"z10":-1.15,"z90":-0.31,"pt10":0.0,"medrank":67.5,"pb":72,"pm":23,"cons":0.54,"last":"2024-12-13","naive":78,"p":123.6,"o":131.2,"bdy":9.7,"out":2.8,"rae":-0.22},{"id":796,"name":"Matthew Wade","rank":72,"rating":-0.02,"z":-0.87,"z10":-1.29,"z90":0.01,"pt10":0.0,"medrank":68.0,"pb":82,"pm":19,"cons":0.48,"last":"2024-04-10","naive":60,"p":135.4,"o":134.5,"bdy":15.9,"out":7.3,"rae":-1.69},{"id":3672,"name":"Kusal Mendis","rank":73,"rating":-0.04,"z":-0.9,"z10":-1.41,"z90":-0.13,"pt10":0.0,"medrank":71.0,"pb":111,"pm":34,"cons":0.71,"last":"2026-10-13","naive":43,"p":148.6,"o":137.5,"bdy":22.5,"out":2.7,"rae":1.02},{"id":3926,"name":"Rahul Tewatia","rank":74,"rating":-0.04,"z":-0.91,"z10":-1.38,"z90":-0.16,"pt10":0.0,"medrank":70.0,"pb":77,"pm":21,"cons":0.52,"last":"2026-05-31","naive":22,"p":162.3,"o":159.4,"bdy":23.4,"out":3.9,"rae":-0.43},{"id":8647,"name":"Sediqullah Atal","rank":75,"rating":-0.07,"z":-0.97,"z10":-1.28,"z90":-0.31,"pt10":0.0,"medrank":71.0,"pb":78,"pm":22,"cons":0.6,"last":"2026-10-29","naive":74,"p":125.6,"o":136.7,"bdy":15.4,"out":2.6,"rae":0.49},{"id":6725,"name":"Sherfane Rutherford","rank":76,"rating":-0.08,"z":-0.99,"z10":-1.52,"z90":0.15,"pt10":0.0,"medrank":70.5,"pb":74,"pm":20,"cons":0.48,"last":"2026-10-14","naive":35,"p":155.4,"o":151.4,"bdy":24.3,"out":10.8,"rae":-0.3},{"id":4219,"name":"Krunal Pandya","rank":77,"rating":-0.13,"z":-1.08,"z10":-1.77,"z90":-0.18,"pt10":0.0,"medrank":76.0,"pb":66,"pm":19,"cons":0.37,"last":"2026-05-31","naive":83,"p":112.1,"o":136.8,"bdy":10.6,"out":7.6,"rae":-2.7},{"id":4854,"name":"Rachin Ravindra","rank":78,"rating":-0.14,"z":-1.1,"z10":-1.65,"z90":-0.08,"pt10":0.0,"medrank":75.0,"pb":49,"pm":19,"cons":0.32,"last":"2026-01-31","naive":85,"p":104.1,"o":147.9,"bdy":12.2,"out":10.2,"rae":-3.62},{"id":4812,"name":"Harry Tector","rank":79,"rating":-0.19,"z":-1.2,"z10":-1.66,"z90":-0.32,"pt10":0.0,"medrank":77.0,"pb":65,"pm":24,"cons":0.51,"last":"2026-06-28","naive":80,"p":123.1,"o":127.7,"bdy":16.9,"out":4.6,"rae":-0.73},{"id":3605,"name":"Aiden Markram","rank":80,"rating":-0.19,"z":-1.22,"z10":-1.83,"z90":-0.47,"pt10":0.0,"medrank":78.0,"pb":120,"pm":43,"cons":0.51,"last":"2026-05-10","naive":67,"p":128.3,"o":139.7,"bdy":15.0,"out":3.3,"rae":-0.04},{"id":1941,"name":"Devon Conway","rank":81,"rating":-0.23,"z":-1.29,"z10":-1.66,"z90":-0.61,"pt10":0.0,"medrank":77.5,"pb":111,"pm":39,"cons":0.57,"last":"2026-03-20","naive":50,"p":144.1,"o":145.0,"bdy":21.6,"out":4.5,"rae":0.05},{"id":2485,"name":"Babar Azam","rank":82,"rating":-0.24,"z":-1.31,"z10":-1.66,"z90":-0.58,"pt10":0.0,"medrank":79.0,"pb":71,"pm":27,"cons":0.51,"last":"2026-02-01","naive":76,"p":123.9,"o":135.9,"bdy":14.1,"out":1.4,"rae":0.61},{"id":7690,"name":"Saim Ayub","rank":83,"rating":-0.24,"z":-1.31,"z10":-2.12,"z90":-0.22,"pt10":0.0,"medrank":78.0,"pb":74,"pm":28,"cons":0.55,"last":"2026-02-01","naive":64,"p":133.8,"o":144.5,"bdy":21.6,"out":6.8,"rae":-0.14},{"id":3639,"name":"Brandon King","rank":84,"rating":-0.25,"z":-1.32,"z10":-1.59,"z90":-0.63,"pt10":0.0,"medrank":78.0,"pb":75,"pm":28,"cons":0.66,"last":"2026-06-15","naive":81,"p":114.7,"o":143.7,"bdy":16.0,"out":8.0,"rae":-0.72},{"id":126,"name":"Rohit Sharma","rank":85,"rating":-0.28,"z":-1.39,"z10":-1.95,"z90":-0.54,"pt10":0.0,"medrank":80.0,"pb":137,"pm":52,"cons":0.57,"last":"2026-05-24","naive":59,"p":135.8,"o":145.7,"bdy":22.6,"out":6.6,"rae":-1.25},{"id":2671,"name":"Liton Das","rank":86,"rating":-0.42,"z":-1.66,"z10":-2.05,"z90":-0.9,"pt10":0.0,"medrank":82.5,"pb":59,"pm":29,"cons":0.33,"last":"2026-04-27","naive":88,"p":83.1,"o":136.0,"bdy":6.8,"out":5.1,"rae":-3.32},{"id":6674,"name":"Rahmanullah Gurbaz","rank":87,"rating":-0.43,"z":-1.68,"z10":-2.08,"z90":-0.57,"pt10":0.0,"medrank":84.0,"pb":108,"pm":38,"cons":0.51,"last":"2026-10-29","naive":41,"p":150.9,"o":138.0,"bdy":20.4,"out":6.5,"rae":0.78},{"id":6448,"name":"Ibrahim Zadran","rank":88,"rating":-0.64,"z":-2.09,"z10":-2.31,"z90":-1.3,"pt10":0.0,"medrank":86.0,"pb":98,"pm":28,"cons":0.56,"last":"2026-10-29","naive":84,"p":108.2,"o":122.3,"bdy":13.3,"out":1.0,"rae":-0.67}],"bowl":[{"id":2933,"name":"Jasprit Bumrah","rank":1,"rating":1.31,"z":2.73,"z10":1.53,"z90":2.98,"pt10":0.97,"medrank":2.0,"pb":161,"pm":48,"cons":0.57,"last":"2026-09-17","naive":23,"p":7.64,"o":7.63,"dot":39.1,"out":3.7,"rae":0.64},{"id":781,"name":"Sunil Narine","rank":2,"rating":1.11,"z":2.26,"z10":1.12,"z90":2.4,"pt10":0.81,"medrank":4.0,"pb":95,"pm":34,"cons":0.65,"last":"2026-05-24","naive":7,"p":6.7,"o":6.89,"dot":37.9,"out":2.1,"rae":1.51},{"id":830,"name":"Josh Hazlewood","rank":3,"rating":0.99,"z":1.95,"z10":0.36,"z90":2.45,"pt10":0.64,"medrank":6.0,"pb":128,"pm":41,"cons":0.68,"last":"2026-05-31","naive":4,"p":6.19,"o":8.05,"dot":53.9,"out":11.7,"rae":4.85},{"id":6523,"name":"Blessing Muzarabani","rank":4,"rating":0.93,"z":1.8,"z10":0.76,"z90":2.32,"pt10":0.63,"medrank":8.0,"pb":76,"pm":22,"cons":0.58,"last":"2026-07-26","naive":9,"p":6.79,"o":8.19,"dot":48.7,"out":9.2,"rae":2.35},{"id":4722,"name":"Rashid Khan","rank":5,"rating":0.91,"z":1.76,"z10":0.62,"z90":2.08,"pt10":0.59,"medrank":8.5,"pb":152,"pm":52,"cons":0.59,"last":"2026-11-01","naive":27,"p":7.97,"o":7.36,"dot":34.2,"out":9.9,"rae":1.73},{"id":6450,"name":"Mujeeb Ur Rahman","rank":6,"rating":0.89,"z":1.71,"z10":0.81,"z90":2.0,"pt10":0.52,"medrank":10.0,"pb":50,"pm":19,"cons":0.74,"last":"2026-10-29","naive":2,"p":5.4,"o":7.06,"dot":46.0,"out":6.0,"rae":4.06},{"id":3644,"name":"Kuldeep Yadav","rank":7,"rating":0.83,"z":1.58,"z10":0.56,"z90":2.17,"pt10":0.46,"medrank":11.0,"pb":138,"pm":48,"cons":0.56,"last":"2026-10-09","naive":18,"p":7.43,"o":7.87,"dot":36.2,"out":8.7,"rae":2.57},{"id":4373,"name":"Mustafizur Rahman","rank":8,"rating":0.81,"z":1.51,"z10":0.45,"z90":1.8,"pt10":0.34,"medrank":13.0,"pb":186,"pm":48,"cons":0.47,"last":"2026-06-19","naive":41,"p":8.48,"o":7.88,"dot":40.9,"out":6.5,"rae":0.79},{"id":6355,"name":"Shaheen Afridi","rank":9,"rating":0.75,"z":1.36,"z10":0.26,"z90":2.01,"pt10":0.43,"medrank":13.0,"pb":123,"pm":33,"cons":0.62,"last":"2026-02-01","naive":13,"p":6.98,"o":8.66,"dot":44.7,"out":8.1,"rae":1.7},{"id":4807,"name":"Joshua Little","rank":10,"rating":0.74,"z":1.35,"z10":0.31,"z90":1.79,"pt10":0.39,"medrank":12.0,"pb":79,"pm":20,"cons":0.44,"last":"2025-11-29","naive":12,"p":6.91,"o":9.36,"dot":39.2,"out":7.6,"rae":0.86},{"id":6256,"name":"Varun Chakravarthy","rank":11,"rating":0.74,"z":1.35,"z10":0.35,"z90":1.65,"pt10":0.27,"medrank":17.0,"pb":169,"pm":49,"cons":0.5,"last":"2026-11-01","naive":34,"p":8.24,"o":8.02,"dot":37.3,"out":5.3,"rae":0.09},{"id":22920,"name":"Jacob Duffy","rank":12,"rating":0.7,"z":1.25,"z10":-0.14,"z90":1.9,"pt10":0.31,"medrank":19.0,"pb":84,"pm":26,"cons":0.37,"last":"2026-11-01","naive":55,"p":9.0,"o":9.1,"dot":42.9,"out":8.3,"rae":0.45},{"id":6669,"name":"Mohsin Khan","rank":13,"rating":0.67,"z":1.17,"z10":-0.2,"z90":1.88,"pt10":0.28,"medrank":21.0,"pb":68,"pm":26,"cons":0.48,"last":"2026-05-23","naive":31,"p":8.12,"o":8.73,"dot":47.1,"out":2.9,"rae":-0.87},{"id":7920,"name":"Nathan Ellis","rank":14,"rating":0.65,"z":1.13,"z10":0.19,"z90":1.76,"pt10":0.22,"medrank":19.0,"pb":93,"pm":25,"cons":0.46,"last":"2026-06-21","naive":82,"p":10.06,"o":7.78,"dot":29.0,"out":6.5,"rae":-0.32},{"id":8661,"name":"Matheesha Pathirana","rank":15,"rating":0.59,"z":0.99,"z10":0.29,"z90":1.57,"pt10":0.23,"medrank":20.5,"pb":77,"pm":23,"cons":0.56,"last":"2026-05-16","naive":70,"p":9.51,"o":8.86,"dot":27.3,"out":6.5,"rae":1.33},{"id":152,"name":"Ravindra Jadeja","rank":16,"rating":0.58,"z":0.96,"z10":0.15,"z90":1.36,"pt10":0.17,"medrank":22.0,"pb":60,"pm":24,"cons":0.74,"last":"2026-05-29","naive":5,"p":6.4,"o":7.94,"dot":35.0,"out":8.3,"rae":2.72},{"id":5379,"name":"Mark Adair","rank":17,"rating":0.55,"z":0.89,"z10":-0.17,"z90":1.51,"pt10":0.21,"medrank":24.5,"pb":79,"pm":23,"cons":0.61,"last":"2026-01-31","naive":38,"p":8.35,"o":9.07,"dot":38.0,"out":13.9,"rae":0.78},{"id":39657,"name":"Eshan Malinga","rank":18,"rating":0.52,"z":0.8,"z10":-0.18,"z90":1.39,"pt10":0.19,"medrank":25.5,"pb":59,"pm":21,"cons":0.42,"last":"2026-10-13","naive":93,"p":11.39,"o":9.07,"dot":28.8,"out":5.1,"rae":-0.2},{"id":2633,"name":"Jason Holder","rank":19,"rating":0.49,"z":0.74,"z10":0.05,"z90":1.5,"pt10":0.15,"medrank":23.0,"pb":148,"pm":55,"cons":0.49,"last":"2026-06-15","naive":46,"p":8.68,"o":8.96,"dot":41.2,"out":5.4,"rae":0.71},{"id":2490,"name":"Mohammad Nawaz","rank":20,"rating":0.48,"z":0.71,"z10":-0.3,"z90":1.4,"pt10":0.17,"medrank":29.5,"pb":67,"pm":30,"cons":0.63,"last":"2026-02-01","naive":8,"p":6.72,"o":7.45,"dot":34.3,"out":9.0,"rae":2.94},{"id":2320,"name":"Trent Boult","rank":21,"rating":0.48,"z":0.7,"z10":-0.22,"z90":1.6,"pt10":0.19,"medrank":29.0,"pb":174,"pm":46,"cons":0.4,"last":"2026-05-02","naive":24,"p":7.76,"o":9.24,"dot":48.9,"out":3.4,"rae":-0.57},{"id":7364,"name":"Haris Rauf","rank":22,"rating":0.43,"z":0.59,"z10":-0.28,"z90":1.3,"pt10":0.15,"medrank":30.0,"pb":105,"pm":25,"cons":0.64,"last":"2025-09-28","naive":33,"p":8.23,"o":8.56,"dot":43.8,"out":10.5,"rae":2.89},{"id":2681,"name":"Taskin Ahmed","rank":23,"rating":0.42,"z":0.56,"z10":-0.35,"z90":1.11,"pt10":0.06,"medrank":33.5,"pb":109,"pm":31,"cons":0.57,"last":"2026-07-19","naive":11,"p":6.88,"o":8.41,"dot":42.2,"out":4.6,"rae":0.2},{"id":4692,"name":"Lockie Ferguson","rank":24,"rating":0.42,"z":0.56,"z10":-0.22,"z90":1.19,"pt10":0.08,"medrank":31.0,"pb":69,"pm":30,"cons":0.61,"last":"2026-10-24","naive":25,"p":7.91,"o":9.23,"dot":50.7,"out":7.2,"rae":1.65},{"id":4641,"name":"Lungi Ngidi","rank":25,"rating":0.41,"z":0.54,"z10":-0.38,"z90":1.25,"pt10":0.11,"medrank":31.5,"pb":85,"pm":24,"cons":0.45,"last":"2026-05-24","naive":28,"p":7.98,"o":8.78,"dot":42.4,"out":4.7,"rae":-0.29},{"id":4219,"name":"Krunal Pandya","rank":26,"rating":0.41,"z":0.53,"z10":-0.18,"z90":1.26,"pt10":0.1,"medrank":31.0,"pb":77,"pm":33,"cons":0.51,"last":"2026-05-31","naive":37,"p":8.34,"o":8.21,"dot":31.2,"out":3.9,"rae":-0.86},{"id":305,"name":"Ravichandran Ashwin","rank":27,"rating":0.41,"z":0.53,"z10":-0.19,"z90":1.06,"pt10":0.06,"medrank":34.5,"pb":85,"pm":29,"cons":0.61,"last":"2025-05-20","naive":3,"p":6.0,"o":8.04,"dot":37.6,"out":3.5,"rae":1.67},{"id":6628,"name":"Gerald Coetzee","rank":28,"rating":0.4,"z":0.52,"z10":-0.38,"z90":1.0,"pt10":0.02,"medrank":35.0,"pb":72,"pm":18,"cons":0.65,"last":"2026-03-25","naive":19,"p":7.5,"o":10.88,"dot":47.2,"out":8.3,"rae":2.48},{"id":2687,"name":"Roston Chase","rank":29,"rating":0.4,"z":0.51,"z10":-0.23,"z90":0.96,"pt10":0.01,"medrank":32.0,"pb":71,"pm":21,"cons":0.53,"last":"2026-10-14","naive":10,"p":6.84,"o":7.81,"dot":43.7,"out":4.2,"rae":1.68},{"id":479,"name":"Adil Rashid","rank":30,"rating":0.4,"z":0.51,"z10":-0.33,"z90":1.09,"pt10":0.06,"medrank":33.5,"pb":67,"pm":25,"cons":0.63,"last":"2026-09-19","naive":16,"p":7.34,"o":8.36,"dot":34.3,"out":10.4,"rae":3.31},{"id":29888,"name":"Harshit Rana","rank":31,"rating":0.36,"z":0.43,"z10":-0.33,"z90":0.99,"pt10":0.04,"medrank":38.5,"pb":114,"pm":33,"cons":0.52,"last":"2026-07-07","naive":78,"p":9.89,"o":9.48,"dot":39.5,"out":9.6,"rae":0.6},{"id":7344,"name":"Shoriful Islam","rank":32,"rating":0.36,"z":0.41,"z10":-0.41,"z90":1.33,"pt10":0.11,"medrank":32.5,"pb":98,"pm":27,"cons":0.51,"last":"2026-06-21","naive":14,"p":7.04,"o":9.2,"dot":45.9,"out":8.2,"rae":0.72},{"id":6464,"name":"Arshdeep Singh","rank":33,"rating":0.35,"z":0.4,"z10":-0.28,"z90":1.03,"pt10":0.05,"medrank":37.0,"pb":395,"pm":103,"cons":0.54,"last":"2026-11-01","naive":72,"p":9.59,"o":9.38,"dot":33.9,"out":4.3,"rae":-0.28},{"id":5944,"name":"Mohammed Siraj","rank":34,"rating":0.35,"z":0.39,"z10":-0.67,"z90":1.25,"pt10":0.11,"medrank":35.0,"pb":186,"pm":49,"cons":0.44,"last":"2026-05-31","naive":54,"p":8.97,"o":9.51,"dot":47.8,"out":7.0,"rae":0.46},{"id":278,"name":"Tim Southee","rank":35,"rating":0.34,"z":0.38,"z10":-0.27,"z90":0.93,"pt10":0.02,"medrank":35.5,"pb":74,"pm":22,"cons":0.64,"last":"2024-02-21","naive":55,"p":9.0,"o":9.02,"dot":43.2,"out":6.8,"rae":1.21},{"id":2261,"name":"Harshal Patel","rank":36,"rating":0.34,"z":0.36,"z10":-0.36,"z90":1.13,"pt10":0.08,"medrank":38.0,"pb":146,"pm":42,"cons":0.56,"last":"2026-05-22","naive":79,"p":9.9,"o":9.1,"dot":28.1,"out":8.9,"rae":0.06},{"id":360,"name":"Bhuvneshwar Kumar","rank":37,"rating":0.33,"z":0.34,"z10":-0.71,"z90":1.01,"pt10":0.05,"medrank":41.0,"pb":291,"pm":76,"cons":0.47,"last":"2026-11-01","naive":76,"p":9.75,"o":8.23,"dot":39.2,"out":4.1,"rae":-1.49},{"id":58246,"name":"Prince Yadav","rank":38,"rating":0.33,"z":0.33,"z10":-0.71,"z90":0.82,"pt10":0.04,"medrank":42.0,"pb":66,"pm":19,"cons":0.67,"last":"2026-11-01","naive":59,"p":9.18,"o":9.82,"dot":34.8,"out":7.6,"rae":1.28},{"id":3628,"name":"Kagiso Rabada","rank":39,"rating":0.32,"z":0.31,"z10":-0.66,"z90":1.03,"pt10":0.05,"medrank":46.5,"pb":173,"pm":48,"cons":0.52,"last":"2026-05-31","naive":61,"p":9.19,"o":9.24,"dot":45.1,"out":4.6,"rae":-1.01},{"id":19316,"name":"Maheesh Theekshana","rank":40,"rating":0.3,"z":0.26,"z10":-0.3,"z90":0.78,"pt10":0.02,"medrank":40.5,"pb":151,"pm":48,"cons":0.58,"last":"2026-10-11","naive":6,"p":6.6,"o":8.27,"dot":44.4,"out":5.3,"rae":2.05},{"id":1612,"name":"Yuzvendra Chahal","rank":41,"rating":0.28,"z":0.21,"z10":-0.57,"z90":0.83,"pt10":0.02,"medrank":37.0,"pb":137,"pm":52,"cons":0.54,"last":"2026-05-23","naive":69,"p":9.42,"o":8.52,"dot":28.5,"out":10.9,"rae":0.9},{"id":7699,"name":"Abbas Afridi","rank":42,"rating":0.27,"z":0.2,"z10":-0.48,"z90":1.07,"pt10":0.02,"medrank":43.5,"pb":69,"pm":17,"cons":0.59,"last":"2025-07-22","naive":57,"p":9.13,"o":8.7,"dot":30.4,"out":11.6,"rae":1.7},{"id":2984,"name":"Sikandar Raza","rank":43,"rating":0.27,"z":0.18,"z10":-0.56,"z90":0.74,"pt10":0.0,"medrank":44.5,"pb":81,"pm":26,"cons":0.71,"last":"2026-10-29","naive":1,"p":5.26,"o":7.64,"dot":46.9,"out":6.2,"rae":2.48},{"id":1758,"name":"Patrick Cummins","rank":44,"rating":0.27,"z":0.18,"z10":-0.46,"z90":1.0,"pt10":0.05,"medrank":39.5,"pb":78,"pm":25,"cons":0.64,"last":"2026-05-27","naive":40,"p":8.46,"o":9.88,"dot":44.9,"out":3.8,"rae":-0.03},{"id":2417,"name":"Akeal Hosein","rank":45,"rating":0.25,"z":0.15,"z10":-0.96,"z90":0.98,"pt10":0.05,"medrank":46.0,"pb":150,"pm":52,"cons":0.5,"last":"2026-10-09","naive":17,"p":7.36,"o":8.12,"dot":45.3,"out":4.0,"rae":-0.23},{"id":2315,"name":"Reece Topley","rank":46,"rating":0.23,"z":0.1,"z10":-0.97,"z90":0.96,"pt10":0.03,"medrank":46.0,"pb":62,"pm":19,"cons":0.47,"last":"2025-06-01","naive":84,"p":10.26,"o":8.59,"dot":32.3,"out":8.1,"rae":-1.54},{"id":4837,"name":"Obed McCoy","rank":47,"rating":0.23,"z":0.09,"z10":-0.89,"z90":0.96,"pt10":0.07,"medrank":50.5,"pb":78,"pm":23,"cons":0.51,"last":"2025-09-27","naive":58,"p":9.15,"o":9.3,"dot":34.6,"out":7.7,"rae":0.34},{"id":7967,"name":"Noor Ahmad","rank":48,"rating":0.22,"z":0.07,"z10":-0.7,"z90":0.73,"pt10":0.02,"medrank":45.0,"pb":81,"pm":28,"cons":0.48,"last":"2026-11-01","naive":44,"p":8.52,"o":8.22,"dot":39.5,"out":3.7,"rae":-0.21},{"id":2876,"name":"Axar Patel","rank":49,"rating":0.22,"z":0.06,"z10":-0.65,"z90":0.78,"pt10":0.0,"medrank":44.5,"pb":200,"pm":69,"cons":0.52,"last":"2026-10-30","naive":29,"p":8.1,"o":7.81,"dot":32.0,"out":1.5,"rae":-0.37},{"id":4900,"name":"Wanindu Hasaranga","rank":50,"rating":0.21,"z":0.06,"z10":-0.71,"z90":0.75,"pt10":0.01,"medrank":47.5,"pb":130,"pm":41,"cons":0.38,"last":"2026-09-17","naive":52,"p":8.91,"o":7.79,"dot":33.8,"out":6.9,"rae":-0.86},{"id":3298,"name":"Jofra Archer","rank":51,"rating":0.18,"z":-0.03,"z10":-0.64,"z90":0.98,"pt10":0.06,"medrank":46.0,"pb":166,"pm":42,"cons":0.5,"last":"2026-09-19","naive":71,"p":9.54,"o":9.58,"dot":38.6,"out":5.4,"rae":0.2},{"id":2411,"name":"Sandeep Sharma","rank":52,"rating":0.17,"z":-0.05,"z10":-0.72,"z90":0.96,"pt10":0.04,"medrank":49.0,"pb":110,"pm":29,"cons":0.5,"last":"2026-05-19","naive":77,"p":9.82,"o":9.11,"dot":32.7,"out":2.7,"rae":-0.36},{"id":403,"name":"Umesh Yadav","rank":53,"rating":0.16,"z":-0.07,"z10":-0.88,"z90":0.99,"pt10":0.06,"medrank":50.0,"pb":88,"pm":22,"cons":0.32,"last":"2024-05-10","naive":35,"p":8.32,"o":10.54,"dot":52.3,"out":4.5,"rae":-1.11},{"id":5809,"name":"Naveen ul Haq","rank":54,"rating":0.16,"z":-0.07,"z10":-0.94,"z90":0.7,"pt10":0.0,"medrank":50.5,"pb":55,"pm":22,"cons":0.39,"last":"2024-12-12","naive":88,"p":10.8,"o":8.5,"dot":30.9,"out":5.5,"rae":-0.59},{"id":4265,"name":"T Natarajan","rank":55,"rating":0.14,"z":-0.13,"z10":-0.7,"z90":0.59,"pt10":0.0,"medrank":50.5,"pb":94,"pm":27,"cons":0.53,"last":"2026-05-05","naive":91,"p":10.91,"o":9.41,"dot":19.1,"out":6.4,"rae":-1.58},{"id":5837,"name":"Mahedi Hasan","rank":56,"rating":0.13,"z":-0.15,"z10":-0.91,"z90":0.73,"pt10":0.03,"medrank":53.0,"pb":100,"pm":30,"cons":0.39,"last":"2026-07-19","naive":47,"p":8.76,"o":7.27,"dot":38.0,"out":4.0,"rae":-1.6},{"id":1813,"name":"Deepak Chahar","rank":57,"rating":0.11,"z":-0.21,"z10":-0.97,"z90":0.67,"pt10":0.0,"medrank":56.5,"pb":96,"pm":29,"cons":0.34,"last":"2026-05-24","naive":39,"p":8.38,"o":9.16,"dot":42.7,"out":4.2,"rae":-1.54},{"id":19312,"name":"Nuwan Thushara","rank":58,"rating":0.1,"z":-0.22,"z10":-1.05,"z90":0.81,"pt10":0.03,"medrank":54.0,"pb":109,"pm":27,"cons":0.41,"last":"2026-10-13","naive":50,"p":8.86,"o":8.98,"dot":33.0,"out":4.6,"rae":-0.02},{"id":1596,"name":"Moeen Ali","rank":59,"rating":0.07,"z":-0.29,"z10":-0.91,"z90":0.41,"pt10":0.0,"medrank":60.5,"pb":48,"pm":20,"cons":0.47,"last":"2025-05-07","naive":42,"p":8.5,"o":8.24,"dot":27.1,"out":4.2,"rae":0.17},{"id":838,"name":"Glenn Maxwell","rank":60,"rating":0.07,"z":-0.31,"z10":-1.15,"z90":0.57,"pt10":0.01,"medrank":59.0,"pb":47,"pm":22,"cons":0.46,"last":"2025-08-16","naive":95,"p":11.49,"o":9.67,"dot":31.9,"out":12.8,"rae":0.26},{"id":3330,"name":"Hardik Pandya","rank":61,"rating":0.06,"z":-0.31,"z10":-1.21,"z90":0.42,"pt10":0.03,"medrank":63.0,"pb":181,"pm":60,"cons":0.56,"last":"2026-05-20","naive":45,"p":8.62,"o":9.13,"dot":40.9,"out":5.5,"rae":0.39},{"id":4874,"name":"Richard Ngarava","rank":62,"rating":0.05,"z":-0.34,"z10":-0.72,"z90":0.16,"pt10":0.0,"medrank":59.5,"pb":77,"pm":23,"cons":0.43,"last":"2026-07-25","naive":86,"p":10.68,"o":8.36,"dot":27.3,"out":1.3,"rae":-1.64},{"id":3697,"name":"Kyle Jamieson","rank":63,"rating":0.05,"z":-0.35,"z10":-0.9,"z90":0.25,"pt10":0.01,"medrank":60.5,"pb":67,"pm":16,"cons":0.54,"last":"2026-10-27","naive":20,"p":7.52,"o":11.72,"dot":47.8,"out":10.4,"rae":1.75},{"id":2636,"name":"Adam Zampa","rank":64,"rating":0.03,"z":-0.39,"z10":-1.06,"z90":0.31,"pt10":0.01,"medrank":59.0,"pb":82,"pm":28,"cons":0.56,"last":"2026-06-21","naive":21,"p":7.54,"o":8.43,"dot":39.0,"out":6.1,"rae":2.19},{"id":4816,"name":"Khaleel Ahmed","rank":65,"rating":0.02,"z":-0.42,"z10":-1.06,"z90":0.55,"pt10":0.02,"medrank":59.0,"pb":148,"pm":40,"cons":0.47,"last":"2026-04-14","naive":22,"p":7.58,"o":8.85,"dot":48.0,"out":4.1,"rae":-0.2},{"id":4489,"name":"Prasidh Krishna","rank":66,"rating":-0.01,"z":-0.5,"z10":-1.18,"z90":0.62,"pt10":0.0,"medrank":60.0,"pb":87,"pm":30,"cons":0.45,"last":"2026-07-11","naive":80,"p":9.93,"o":8.9,"dot":33.3,"out":4.6,"rae":-1.13},{"id":4101,"name":"Mitchell Santner","rank":67,"rating":-0.02,"z":-0.51,"z10":-1.16,"z90":0.33,"pt10":0.0,"medrank":65.0,"pb":83,"pm":35,"cons":0.45,"last":"2026-11-01","naive":68,"p":9.4,"o":7.4,"dot":27.7,"out":3.6,"rae":-1.9},{"id":7250,"name":"Mukesh Choudhary","rank":68,"rating":-0.03,"z":-0.53,"z10":-1.25,"z90":0.31,"pt10":0.0,"medrank":65.0,"pb":59,"pm":17,"cons":0.38,"last":"2026-05-21","naive":53,"p":8.95,"o":9.52,"dot":49.2,"out":3.4,"rae":-1.91},{"id":6806,"name":"Tushar Deshpande","rank":69,"rating":-0.03,"z":-0.55,"z10":-1.32,"z90":0.34,"pt10":0.01,"medrank":68.5,"pb":96,"pm":33,"cons":0.51,"last":"2026-05-29","naive":89,"p":10.81,"o":9.85,"dot":36.5,"out":4.2,"rae":-1.16},{"id":7503,"name":"Ravi Bishnoi","rank":70,"rating":-0.06,"z":-0.6,"z10":-1.21,"z90":0.14,"pt10":0.0,"medrank":65.5,"pb":154,"pm":50,"cons":0.61,"last":"2026-09-17","naive":63,"p":9.31,"o":8.45,"dot":30.5,"out":5.8,"rae":0.14},{"id":3653,"name":"Avesh Khan","rank":71,"rating":-0.07,"z":-0.63,"z10":-1.34,"z90":0.44,"pt10":0.0,"medrank":69.5,"pb":164,"pm":46,"cons":0.5,"last":"2026-05-10","naive":92,"p":11.34,"o":9.76,"dot":25.6,"out":5.5,"rae":-1.66},{"id":2399,"name":"Dushmantha Chameera","rank":72,"rating":-0.08,"z":-0.65,"z10":-1.72,"z90":0.31,"pt10":0.01,"medrank":64.5,"pb":98,"pm":29,"cons":0.56,"last":"2026-10-09","naive":74,"p":9.73,"o":8.99,"dot":37.8,"out":10.2,"rae":0.98},{"id":2847,"name":"Shardul Thakur","rank":73,"rating":-0.1,"z":-0.7,"z10":-1.61,"z90":0.09,"pt10":0.0,"medrank":68.5,"pb":88,"pm":24,"cons":0.59,"last":"2026-05-24","naive":35,"p":8.32,"o":11.0,"dot":37.5,"out":4.5,"rae":0.51},{"id":7322,"name":"Yash Dayal","rank":74,"rating":-0.1,"z":-0.72,"z10":-1.23,"z90":0.03,"pt10":0.0,"medrank":70.0,"pb":76,"pm":27,"cons":0.53,"last":"2025-06-03","naive":66,"p":9.39,"o":9.63,"dot":39.5,"out":3.9,"rae":-0.63},{"id":1566,"name":"Mohammed Shami","rank":75,"rating":-0.11,"z":-0.73,"z10":-1.29,"z90":0.36,"pt10":0.01,"medrank":66.5,"pb":162,"pm":43,"cons":0.38,"last":"2026-05-23","naive":64,"p":9.33,"o":8.49,"dot":44.4,"out":4.3,"rae":-1.8},{"id":7327,"name":"Rasikh Salam","rank":76,"rating":-0.11,"z":-0.73,"z10":-1.22,"z90":-0.07,"pt10":0.0,"medrank":69.0,"pb":57,"pm":14,"cons":0.47,"last":"2026-05-31","naive":30,"p":8.11,"o":9.85,"dot":38.6,"out":5.3,"rae":0.36},{"id":7240,"name":"FazalHaq Farooqi","rank":77,"rating":-0.11,"z":-0.74,"z10":-1.32,"z90":0.14,"pt10":0.0,"medrank":69.5,"pb":109,"pm":34,"cons":0.58,"last":"2026-11-01","naive":50,"p":8.86,"o":8.57,"dot":36.7,"out":6.4,"rae":-0.52},{"id":5041,"name":"Mukesh Kumar","rank":78,"rating":-0.15,"z":-0.83,"z10":-1.25,"z90":-0.04,"pt10":0.0,"medrank":72.0,"pb":144,"pm":44,"cons":0.39,"last":"2026-05-17","naive":87,"p":10.71,"o":10.16,"dot":34.7,"out":5.6,"rae":-0.84},{"id":8049,"name":"Naseem Shah","rank":79,"rating":-0.15,"z":-0.85,"z10":-1.57,"z90":-0.05,"pt10":0.0,"medrank":75.0,"pb":67,"pm":17,"cons":0.38,"last":"2026-10-11","naive":43,"p":8.51,"o":8.99,"dot":43.3,"out":6.0,"rae":-1.13},{"id":5441,"name":"Barry McCarthy","rank":80,"rating":-0.16,"z":-0.86,"z10":-1.26,"z90":-0.16,"pt10":0.0,"medrank":76.0,"pb":53,"pm":18,"cons":0.67,"last":"2026-01-31","naive":67,"p":9.4,"o":8.79,"dot":26.4,"out":1.9,"rae":-0.54},{"id":3275,"name":"Alzarri Joseph","rank":81,"rating":-0.16,"z":-0.86,"z10":-1.65,"z90":0.1,"pt10":0.0,"medrank":72.0,"pb":116,"pm":31,"cons":0.38,"last":"2025-07-28","naive":49,"p":8.79,"o":10.2,"dot":34.5,"out":6.9,"rae":-0.06},{"id":4409,"name":"Sam Curran","rank":82,"rating":-0.18,"z":-0.91,"z10":-1.46,"z90":-0.1,"pt10":0.0,"medrank":76.0,"pb":157,"pm":43,"cons":0.56,"last":"2026-07-09","naive":75,"p":9.74,"o":10.24,"dot":27.4,"out":5.1,"rae":-0.12},{"id":32862,"name":"Allah Ghazanfar","rank":83,"rating":-0.23,"z":-1.03,"z10":-1.46,"z90":-0.11,"pt10":0.0,"medrank":79.0,"pb":64,"pm":13,"cons":0.39,"last":"2026-05-24","naive":60,"p":9.19,"o":7.81,"dot":39.1,"out":6.2,"rae":-0.68},{"id":7808,"name":"Marco Jansen","rank":84,"rating":-0.25,"z":-1.08,"z10":-1.61,"z90":0.06,"pt10":0.01,"medrank":72.0,"pb":135,"pm":40,"cons":0.5,"last":"2026-05-23","naive":62,"p":9.24,"o":10.04,"dot":46.7,"out":5.9,"rae":0.39},{"id":5939,"name":"Cameron Green","rank":85,"rating":-0.25,"z":-1.09,"z10":-1.62,"z90":-0.14,"pt10":0.0,"medrank":79.5,"pb":58,"pm":25,"cons":0.51,"last":"2026-05-24","naive":32,"p":8.17,"o":10.13,"dot":50.0,"out":3.4,"rae":0.36},{"id":6676,"name":"Azmatullah Omarzai","rank":86,"rating":-0.3,"z":-1.21,"z10":-1.67,"z90":-0.37,"pt10":0.0,"medrank":83.0,"pb":97,"pm":29,"cons":0.34,"last":"2026-11-01","naive":81,"p":10.02,"o":8.85,"dot":33.0,"out":5.2,"rae":-1.81},{"id":22134,"name":"Luke Jongwe","rank":87,"rating":-0.3,"z":-1.22,"z10":-1.56,"z90":-0.28,"pt10":0.0,"medrank":83.0,"pb":45,"pm":13,"cons":0.43,"last":"2024-07-07","naive":85,"p":10.27,"o":8.95,"dot":24.4,"out":11.1,"rae":-1.32},{"id":7905,"name":"Tanzim Sakib","rank":88,"rating":-0.31,"z":-1.22,"z10":-1.78,"z90":-0.21,"pt10":0.0,"medrank":81.5,"pb":68,"pm":21,"cons":0.58,"last":"2026-04-27","naive":15,"p":7.06,"o":9.34,"dot":38.2,"out":5.9,"rae":1.17},{"id":3174,"name":"Matt Henry","rank":89,"rating":-0.44,"z":-1.54,"z10":-2.01,"z90":-0.42,"pt10":0.0,"medrank":84.0,"pb":47,"pm":18,"cons":0.51,"last":"2026-10-24","naive":73,"p":9.7,"o":9.27,"dot":42.6,"out":6.4,"rae":-1.61},{"id":2526,"name":"Ish Sodhi","rank":90,"rating":-0.47,"z":-1.61,"z10":-1.73,"z90":-0.59,"pt10":0.0,"medrank":84.0,"pb":56,"pm":20,"cons":0.63,"last":"2026-04-27","naive":26,"p":7.93,"o":8.55,"dot":41.1,"out":5.4,"rae":-0.82},{"id":1318,"name":"Andre Russell","rank":91,"rating":-0.47,"z":-1.62,"z10":-2.02,"z90":-0.58,"pt10":0.0,"medrank":90.0,"pb":73,"pm":29,"cons":0.44,"last":"2025-07-22","naive":65,"p":9.37,"o":11.29,"dot":39.7,"out":6.8,"rae":-0.22},{"id":829,"name":"Mitchell Starc","rank":92,"rating":-0.5,"z":-1.68,"z10":-2.7,"z90":-0.49,"pt10":0.0,"medrank":92.0,"pb":81,"pm":27,"cons":0.43,"last":"2026-05-24","naive":90,"p":10.89,"o":9.52,"dot":48.1,"out":7.4,"rae":-2.08},{"id":8746,"name":"Vaibhav Arora","rank":93,"rating":-0.5,"z":-1.68,"z10":-2.35,"z90":-0.59,"pt10":0.0,"medrank":89.5,"pb":110,"pm":31,"cons":0.48,"last":"2026-05-13","naive":83,"p":10.14,"o":9.83,"dot":40.9,"out":4.5,"rae":-1.22},{"id":6726,"name":"Romario Shepherd","rank":94,"rating":-0.53,"z":-1.78,"z10":-2.12,"z90":-0.71,"pt10":0.0,"medrank":90.0,"pb":127,"pm":47,"cons":0.48,"last":"2026-10-14","naive":94,"p":11.43,"o":10.34,"dot":29.9,"out":9.4,"rae":-1.62},{"id":8380,"name":"Mohammad Rishad Hossain","rank":95,"rating":-0.63,"z":-2.02,"z10":-2.27,"z90":-0.93,"pt10":0.0,"medrank":92.0,"pb":63,"pm":26,"cons":0.56,"last":"2026-07-19","naive":48,"p":8.76,"o":9.18,"dot":36.5,"out":6.3,"rae":-0.86},{"id":2639,"name":"Marcus Stoinis","rank":96,"rating":-0.71,"z":-2.21,"z10":-2.51,"z90":-1.18,"pt10":0.0,"medrank":94.0,"pb":56,"pm":23,"cons":0.38,"last":"2026-05-11","naive":96,"p":12.43,"o":9.19,"dot":30.4,"out":7.1,"rae":-2.36},{"id":7270,"name":"Anrich Nortje","rank":97,"rating":-0.72,"z":-2.23,"z10":-2.46,"z90":-1.13,"pt10":0.0,"medrank":94.0,"pb":77,"pm":24,"cons":0.43,"last":"2026-04-01","naive":97,"p":13.17,"o":10.54,"dot":24.7,"out":3.9,"rae":-3.09}],"heat":[[2.85,2.06,1.75,1.6,1.5,1.36,1.26,1.3,1.34,1.48,1.43,1.37,1.42,1.4,1.58,2.0,2.14,2.27,3.19,7.94],[3.22,2.81,2.8,2.98,2.97,3.05,2.79,2.77,2.75,2.56,2.6,2.54,3.1,3.2,3.49,4.45,4.89,5.4,6.7,13.18],[3.36,3.25,3.41,3.48,3.49,3.38,3.21,3.43,3.54,3.49,3.27,3.49,3.6,3.69,4.47,6.09,6.59,7.1,8.55,18.64],[3.7,3.45,3.78,3.52,3.24,3.24,3.11,3.06,3.5,3.64,3.99,4.39,4.41,3.99,4.77,6.2,7.5,8.36,11.12,19.04],[3.76,3.6,3.35,3.03,2.94,2.86,2.69,2.89,2.84,3.11,3.36,3.71,3.96,4.0,4.67,5.76,6.79,7.28,10.66,19.31],[3.09,2.42,2.12,2.14,2.25,2.4,2.3,2.3,2.31,2.55,2.72,2.95,2.86,3.53,3.6,4.97,5.78,6.4,8.83,15.56],[2.43,1.89,1.68,1.6,1.53,1.57,1.33,1.38,1.54,1.56,1.55,1.56,1.68,1.9,1.98,2.8,3.34,3.86,5.12,8.2]],"heat_rows":["3-15","15-30","30-45","45-55","55-70","70-85","85-97"],"phases":{"Death":{"er":1.61,"ew":7.2,"C":1.9},"Middle":{"er":1.35,"ew":4.6,"C":4.5},"Powerplay":{"er":1.38,"ew":4.3,"C":6.6}},"tiers":{"Ordinary":{"balls":97815,"rpb":1.43,"dot":34.2,"bdy":18.6,"wkt":5.4},"Elevated":{"balls":48747,"rpb":1.39,"dot":36.5,"bdy":18.5,"wkt":5.2},"High":{"balls":11303,"rpb":1.39,"dot":38.1,"bdy":18.9,"wkt":6.0},"Extreme":{"balls":4823,"rpb":1.42,"dot":37.7,"bdy":18.9,"wkt":7.3},"Decided":{"balls":24384,"rpb":1.43,"dot":35.7,"bdy":18.7,"wkt":6.8}},"val":[{"kind":"random-split mean","side":"bat","tier":"Elev+","pred":"cons","rho":-0.057,"n":68.0},{"kind":"random-split mean","side":"bat","tier":"Elev+","pred":"delta","rho":0.002,"n":68.0},{"kind":"random-split mean","side":"bat","tier":"Elev+","pred":"level","rho":0.236,"n":68.0},{"kind":"random-split mean","side":"bat","tier":"Elev+","pred":"naive_overall_mean","rho":0.269,"n":68.0},{"kind":"random-split mean","side":"bat","tier":"Elev+","pred":"naive_pressure_mean","rho":-0.085,"n":68.0},{"kind":"random-split mean","side":"bat","tier":"High+","pred":"cons","rho":-0.063,"n":62.0},{"kind":"random-split mean","side":"bat","tier":"High+","pred":"delta","rho":-0.063,"n":62.0},{"kind":"random-split mean","side":"bat","tier":"High+","pred":"level","rho":0.022,"n":62.0},{"kind":"random-split mean","side":"bat","tier":"High+","pred":"naive_overall_mean","rho":0.076,"n":62.0},{"kind":"random-split mean","side":"bat","tier":"High+","pred":"naive_pressure_mean","rho":-0.188,"n":62.0},{"kind":"random-split mean","side":"bowl","tier":"Elev+","pred":"cons","rho":0.076,"n":90.0},{"kind":"random-split mean","side":"bowl","tier":"Elev+","pred":"delta","rho":0.11,"n":90.0},{"kind":"random-split mean","side":"bowl","tier":"Elev+","pred":"level","rho":0.241,"n":90.0},{"kind":"random-split mean","side":"bowl","tier":"Elev+","pred":"naive_overall_mean","rho":0.286,"n":90.0},{"kind":"random-split mean","side":"bowl","tier":"Elev+","pred":"naive_pressure_mean","rho":0.169,"n":90.0},{"kind":"random-split mean","side":"bowl","tier":"High+","pred":"cons","rho":0.074,"n":80.0},{"kind":"random-split mean","side":"bowl","tier":"High+","pred":"delta","rho":0.07,"n":80.0},{"kind":"random-split mean","side":"bowl","tier":"High+","pred":"level","rho":0.124,"n":80.0},{"kind":"random-split mean","side":"bowl","tier":"High+","pred":"naive_overall_mean","rho":0.158,"n":80.0},{"kind":"random-split mean","side":"bowl","tier":"High+","pred":"naive_pressure_mean","rho":0.127,"n":80.0},{"kind":"temporal","side":"bat","tier":"Elev+","pred":"cons","rho":-0.076,"n":66.0},{"kind":"temporal","side":"bat","tier":"Elev+","pred":"delta","rho":-0.033,"n":66.0},{"kind":"temporal","side":"bat","tier":"Elev+","pred":"level","rho":0.047,"n":66.0},{"kind":"temporal","side":"bat","tier":"Elev+","pred":"naive_overall_mean","rho":0.032,"n":66.0},{"kind":"temporal","side":"bat","tier":"Elev+","pred":"naive_pressure_mean","rho":-0.07,"n":66.0},{"kind":"temporal","side":"bat","tier":"High+","pred":"cons","rho":-0.295,"n":60.0},{"kind":"temporal","side":"bat","tier":"High+","pred":"delta","rho":-0.148,"n":60.0},{"kind":"temporal","side":"bat","tier":"High+","pred":"level","rho":-0.187,"n":60.0},{"kind":"temporal","side":"bat","tier":"High+","pred":"naive_overall_mean","rho":-0.128,"n":60.0},{"kind":"temporal","side":"bat","tier":"High+","pred":"naive_pressure_mean","rho":-0.213,"n":60.0},{"kind":"temporal","side":"bowl","tier":"Elev+","pred":"cons","rho":0.038,"n":81.0},{"kind":"temporal","side":"bowl","tier":"Elev+","pred":"delta","rho":0.009,"n":81.0},{"kind":"temporal","side":"bowl","tier":"Elev+","pred":"level","rho":0.215,"n":81.0},{"kind":"temporal","side":"bowl","tier":"Elev+","pred":"naive_overall_mean","rho":0.235,"n":81.0},{"kind":"temporal","side":"bowl","tier":"Elev+","pred":"naive_pressure_mean","rho":0.107,"n":81.0},{"kind":"temporal","side":"bowl","tier":"High+","pred":"cons","rho":0.006,"n":62.0},{"kind":"temporal","side":"bowl","tier":"High+","pred":"delta","rho":0.012,"n":62.0},{"kind":"temporal","side":"bowl","tier":"High+","pred":"level","rho":0.034,"n":62.0},{"kind":"temporal","side":"bowl","tier":"High+","pred":"naive_overall_mean","rho":0.023,"n":62.0},{"kind":"temporal","side":"bowl","tier":"High+","pred":"naive_pressure_mean","rho":0.092,"n":62.0}],"sens":[{"setting":"default","side":"bat","top10_overlap":10,"rho_full_ranking":1.0},{"setting":"default","side":"bowl","top10_overlap":10,"rho_full_ranking":1.0},{"setting":"alpha x3","side":"bat","top10_overlap":9,"rho_full_ranking":0.996},{"setting":"alpha x3","side":"bowl","top10_overlap":9,"rho_full_ranking":0.991},{"setting":"alpha /3","side":"bat","top10_overlap":9,"rho_full_ranking":0.991},{"setting":"alpha /3","side":"bowl","top10_overlap":8,"rho_full_ranking":0.988},{"setting":"no pressure re-weight (k=0)","side":"bat","top10_overlap":8,"rho_full_ranking":0.951},{"setting":"no pressure re-weight (k=0)","side":"bowl","top10_overlap":8,"rho_full_ranking":0.891},{"setting":"slope f=1","side":"bat","top10_overlap":8,"rho_full_ranking":0.978},{"setting":"slope f=1","side":"bowl","top10_overlap":9,"rho_full_ranking":0.971},{"setting":"level only","side":"bat","top10_overlap":10,"rho_full_ranking":1.0},{"setting":"level only","side":"bowl","top10_overlap":10,"rho_full_ranking":1.0},{"setting":"0.8/0/0.2","side":"bat","top10_overlap":9,"rho_full_ranking":0.967},{"setting":"0.8/0/0.2","side":"bowl","top10_overlap":9,"rho_full_ranking":0.971},{"setting":"0.5/0.25/0.25","side":"bat","top10_overlap":7,"rho_full_ranking":0.899},{"setting":"0.5/0.25/0.25","side":"bowl","top10_overlap":7,"rho_full_ranking":0.891}]}</script>
+<script>
+const D = JSON.parse(document.getElementById('data').textContent);
+const $ = (s, r = document) => r.querySelector(s), $$ = (s, r = document) => [...r.querySelectorAll(s)];
+const NS = 'http://www.w3.org/2000/svg';
+const tip = $('#tip');
+const sgn = (x, d = 2) => (x >= 0 ? '+' : '−') + Math.abs(x).toFixed(d);
+function showTip(e, html) { tip.innerHTML = html; tip.classList.add('on'); const w = tip.offsetWidth; let x = e.clientX + 14, y = e.clientY + 14; if (x + w > innerWidth - 8) x = e.clientX - w - 14; tip.style.left = x + 'px'; tip.style.top = y + 'px'; }
+function hideTip() { tip.classList.remove('on'); }
+function svgEl(tag, attrs = {}, parent) { const e = document.createElementNS(NS, tag); for (const k in attrs) e.setAttribute(k, attrs[k]); if (parent) parent.appendChild(e); return e; }
+function toggleGroup(root, attr, cb) { $$('button', root).forEach(b => b.addEventListener('click', () => { $$('button', root).forEach(x => x.setAttribute('aria-pressed', x === b)); cb(b.dataset[attr]); })); }
+
+/* hero + stats */
+const m = D.meta;
+$('#heroRows').innerHTML = [['bat', D.bat[0]], ['bat', D.bat[1]], ['bowl', D.bowl[0]], ['bowl', D.bowl[1]]].map(([s, p]) =>
+  `<div class="srow"><span class="rk">#${p.rank}</span><span><span class="nm">${p.name}</span> <span class="tag ${s}">${s === 'bat' ? 'Bat' : 'Bowl'}</span></span><span class="vl">${sgn(p.rating)}</span></div>`).join('');
+$('#stats').innerHTML = [[m.matches, 'clean matches, ' + m.ipl + ' IPL and ' + m.t20i + ' T20I'], [Math.round(m.balls / 1000) + 'k', 'deliveries scored'], [D.bat.length + D.bowl.length, 'players eligible to rank'], ['0.89', 'win-probability AUC in chases']].map(([a, b]) => `<div><b>${a}</b><span>${b}</span></div>`).join('');
+$('#auc2').textContent = 'AUC 0.89';
+$('#foot').textContent = 'Data window: ' + m.first + ' to ' + m.last + '. IPL 2022 to 2026 and T20Is from 2022. Rain-affected, tied and no-result matches and super overs removed.';
+
+/* ranking */
+function detailHTML(p, s) {
+  const kv = (a, b, c) => `<div class="kv"><small>${a}</small><b>${b}</b>${c ? `<span>${c}</span>` : ''}</div>`;
+  const rows = s === 'bat' ? [
+    kv('Strike rate', p.p.toFixed(0) + ' vs ' + p.o.toFixed(0), 'pressure vs ordinary'),
+    kv('Boundary share', p.bdy.toFixed(1) + '%', 'of balls faced under pressure'),
+    kv('Dismissal rate', p.out.toFixed(1) + '%', 'of balls under pressure'),
+    kv('Runs above expected', sgn(p.rae), 'per over under pressure, raw')
+  ] : [
+    kv('Economy', p.p.toFixed(2) + ' vs ' + p.o.toFixed(2), 'pressure vs ordinary'),
+    kv('Dot-ball share', p.dot.toFixed(1) + '%', 'of balls under pressure'),
+    kv('Wicket rate', p.out.toFixed(1) + '%', 'of balls under pressure'),
+    kv('Runs saved', sgn(p.rae), 'per over under pressure, raw')
+  ];
+  rows.push(kv('Pressure sample', p.pb + ' balls', p.pm + ' matches'));
+  rows.push(kv('Rating band', sgn(p.z10, 1) + ' to ' + sgn(p.z90, 1), '10th to 90th pct of bootstrap, z-score'));
+  rows.push(kv('Naive rank', '#' + p.naive, (s === 'bat' ? 'by pressure strike rate' : 'by pressure economy') + ', same pool'));
+  rows.push(kv('Consistency', Math.round(p.cons * 100) + '%', 'pressure matches in the black, diagnostic only'));
+  return rows.join('');
+}
+let rSide = 'bat';
+function chipClass(v) { return v >= .75 ? 'solid' : v >= .5 ? 'mid' : 'edge'; }
+function renderRank() {
+  const list = D[rSide].slice(0, 10), mx = Math.max(...list.map(p => p.rating));
+  $('#rankWrap').dataset.side = rSide;
+  $('#rankList').innerHTML = list.map(p => `<li><details><summary>
+    <span class="n">${p.rank}</span>
+    <span class="who"><b>${p.name}</b><span>${p.pb} pressure balls &middot; ${p.pm} matches &middot; last played ${p.last}</span></span>
+    <span class="meter"><span class="track"><span class="fill" style="display:block;width:${(p.rating / mx * 100).toFixed(1)}%"></span></span><span class="val"><b>${sgn(p.rating)}</b> runs/over above average</span></span>
+    <span class="chip ${chipClass(p.pt10)}">${Math.round(p.pt10 * 100)}% stay top 10</span><span class="chev"></span>
+  </summary><div class="detail">${detailHTML(p, rSide)}</div></details></li>`).join('');
+  $('#rankNote').textContent = rSide === 'bat'
+    ? 'Batters in the very top pressure tier are the least predictable group in our held-out tests, so read the order as tiers. Naive rank shows where each player would sit on raw pressure strike rate alone.'
+    : 'Bowlers are the more predictable group in our held-out tests. Naive rank shows where each player would sit on raw pressure economy alone.';
+}
+toggleGroup($('.toggle[aria-label="List"]'), 's', s => { rSide = s; renderRank(); });
+renderRank();
+
+/* explorer */
+let eSide = 'bat', sel = null;
+function renderScatter() {
+  const L = D[eSide], svg = $('#scatter'); svg.innerHTML = '';
+  const vals = L.flatMap(p => [p.p, p.o]); let lo = Math.min(...vals), hi = Math.max(...vals);
+  const pad = (hi - lo) * 0.06; lo -= pad; hi += pad;
+  const W = 640, H = 440, ml = 52, mr = 14, mt = 12, mb = 46;
+  const X = v => ml + (v - lo) / (hi - lo) * (W - ml - mr), Y = v => H - mb - (v - lo) / (hi - lo) * (H - mt - mb);
+  const step = eSide === 'bat' ? 20 : 1; const t0 = Math.ceil(lo / step) * step;
+  for (let t = t0; t <= hi; t += step) {
+    svgEl('line', { x1: X(t), x2: X(t), y1: mt, y2: H - mb, class: 'axis' }, svg); svgEl('line', { x1: ml, x2: W - mr, y1: Y(t), y2: Y(t), class: 'axis' }, svg);
+    svgEl('text', { x: X(t), y: H - mb + 16, 'text-anchor': 'middle' }, svg).textContent = t; svgEl('text', { x: ml - 8, y: Y(t) + 4, 'text-anchor': 'end' }, svg).textContent = t;
+  }
+  svgEl('line', { x1: X(lo), y1: Y(lo), x2: X(hi), y2: Y(hi), class: 'diag' }, svg);
+  svgEl('text', { x: (ml + W - mr) / 2, y: H - 8, 'text-anchor': 'middle' }, svg).textContent = eSide === 'bat' ? 'Strike rate in ordinary situations' : 'Economy in ordinary situations';
+  const yl = svgEl('text', { x: 0, y: 0, transform: `translate(14 ${(mt + H - mb) / 2}) rotate(-90)`, 'text-anchor': 'middle' }, svg); yl.textContent = eSide === 'bat' ? 'Strike rate under pressure' : 'Economy under pressure';
+  const col = eSide === 'bat' ? 'var(--accent)' : 'var(--blue)';
+  $('#lgTop').style.background = col;
+  [...L].sort((a, b) => b.rank - a.rank).forEach(p => {
+    const top = p.rank <= 10, g = svgEl('g', { class: 'pt', tabindex: 0, role: 'button', 'aria-label': p.name }, svg);
+    svgEl('circle', { cx: X(p.o), cy: Y(p.p), r: 18, fill: 'transparent' }, g);
+    const c = svgEl('circle', { cx: X(p.o), cy: Y(p.p), r: top ? 6 : 4.5, fill: top ? col : 'var(--ink3)', 'fill-opacity': top ? 1 : 0.55, stroke: sel && sel.id === p.id ? 'var(--ink)' : 'var(--surface)', 'stroke-width': sel && sel.id === p.id ? 2.5 : 1.5 }, g);
+    g.addEventListener('mousemove', e => showTip(e, `<b>${p.name}</b><br>#${p.rank} &middot; ${eSide === 'bat' ? 'SR' : 'Econ'} ${p.p} pressure, ${p.o} ordinary`));
+    g.addEventListener('mouseleave', hideTip); g.addEventListener('click', () => select(p)); g.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); select(p); } });
+  });
+  if (sel && sel.side === eSide) { const p = L.find(q => q.id === sel.id); if (p) svgEl('text', { x: X(p.o) + (X(p.o) > 520 ? 8 : 0), y: Y(p.p) - 12, 'text-anchor': X(p.o) > 520 ? 'end' : 'middle', style: 'fill:var(--ink);font-weight:500' }, svg).textContent = p.name; }
+  $('#lgHint').textContent = eSide === 'bat' ? 'Above the dashed line: faster under pressure' : 'Below the dashed line: cheaper under pressure';
+  $('#expLede').textContent = eSide === 'bat' ? 'Each dot is a batter. Raw strike rate alone barely separates players, which is why the rating adjusts for the situation, the bowlers faced and sample size. Click a dot or search by name.' : 'Each dot is a bowler. Economy under pressure is hard to read on its own, because the states differ. The rating compares each bowler with what an average bowler concedes in the same states. Click a dot or search by name.';
+  $('#pList').innerHTML = L.map(p => `<option value="${p.name}">`).join('');
+}
+function select(p) {
+  sel = { id: p.id, side: eSide }; $('#pSearch').value = p.name;
+  const s = eSide;
+  $('#pCard').innerHTML = `<h3>${p.name}</h3><div class="sub">${s === 'bat' ? 'Batter' : 'Bowler'} &middot; rank #${p.rank} of ${D[s].length} &middot; rating ${sgn(p.rating)} runs/over &middot; ${Math.round(p.pt10 * 100)}% stay in top 10</div><div class="grid">${detailHTML(p, s)}</div>`;
+  renderScatter();
+}
+toggleGroup($('.toggle[aria-label="Player type"]'), 's', s => { eSide = s; sel = null; $('#pSearch').value = ''; renderScatter(); select(D[s][0]); });
+$('#pSearch').addEventListener('change', e => { const p = D[eSide].find(q => q.name.toLowerCase() === e.target.value.trim().toLowerCase()); if (p) select(p); });
+renderScatter(); select(D.bat[0]);
+
+/* heat map */
+(function () {
+  const svg = $('#heat'), rows = D.heat_rows, H = D.heat; const ml = 46, mt = 6, cw = 25, ch = 32;
+  const mx = Math.max(...H.flat().filter(v => v != null));
+  rows.forEach((lab, r) => {
+    svgEl('text', { x: ml - 6, y: mt + (rows.length - 1 - r) * ch + ch / 2 + 4, 'text-anchor': 'end' }, svg).textContent = lab + '%';
+    H[r].forEach((v, c) => {
+      const rect = svgEl('rect', { x: ml + c * cw, y: mt + (rows.length - 1 - r) * ch, width: cw - 2, height: ch - 2, rx: 3, style: v == null ? 'fill:var(--surface2)' : `fill:color-mix(in srgb, var(--accent) ${Math.round(8 + v / mx * 92)}%, var(--surface))` }, svg);
+      rect.addEventListener('mousemove', e => showTip(e, v == null ? `Over ${c + 1}, win prob ${lab}%: too few balls` : `Over ${c + 1}, chasing side win prob ${lab}%<br>next ball swings win probability by <b>${v.toFixed(1)}</b> points`));
+      rect.addEventListener('mouseleave', hideTip);
+    });
+  });
+  for (let c = 0; c < 20; c += 2) svgEl('text', { x: ml + c * cw + cw / 2, y: mt + rows.length * ch + 14, 'text-anchor': 'middle' }, svg).textContent = c + 1;
+  svgEl('text', { x: ml + 10 * cw, y: mt + rows.length * ch + 30, 'text-anchor': 'middle' }, svg).textContent = 'Over of the chase';
+})();
+
+/* tier chart + cards */
+const TN = ['Ordinary', 'Elevated', 'High', 'Extreme'];
+function renderTier(met) {
+  const svg = $('#tierChart'); svg.innerHTML = '';
+  const v = TN.map(t => D.tiers[t][met]), mx = Math.max(...v) * 1.2; const ml = 12, bw = 82, gap = 34, base = 210;
+  v.forEach((x, i) => {
+    const h = x / mx * 170, xx = ml + i * (bw + gap) + 20;
+    svgEl('rect', { x: xx, y: base - h, width: bw, height: h, rx: 4, fill: i >= 2 ? 'var(--accent)' : 'color-mix(in srgb, var(--accent) 38%, var(--surface))' }, svg);
+    svgEl('text', { x: xx + bw / 2, y: base - h - 8, 'text-anchor': 'middle', style: 'fill:var(--ink);font-weight:500;font-size:13px' }, svg).textContent = x.toFixed(1) + '%';
+    svgEl('text', { x: xx + bw / 2, y: base + 20, 'text-anchor': 'middle' }, svg).textContent = TN[i];
+  });
+  svgEl('line', { x1: ml + 10, x2: 510, y1: base, y2: base, class: 'axis' }, svg);
+}
+toggleGroup($('#tierToggle'), 'm', renderTier); renderTier('dot');
+const tdesc = { Ordinary: 'Below the 60th percentile of leverage. The usual level of play.', Elevated: '60th to 90th percentile. The match is live and tightening.', High: '90th to 97th percentile. Close, late, and costly.', Extreme: 'Top 3%. A single ball can decide the match.' };
+const trng = { Ordinary: '< 60th pct', Elevated: '60th - 90th pct', High: '90th - 97th pct', Extreme: '97th pct +' };
+$('#tierCards').innerHTML = TN.map((t, i) => `<div class="tier" style="--t:${[15, 40, 75, 100][i]}%"><b>${t}</b><span class="rng">${trng[t]}</span><p>${tdesc[t]}</p><p class="mono" style="margin-top:8px;font-size:.75rem">${D.tiers[t].balls.toLocaleString()} balls</p></div>`).join('');
+
+/* value of a ball */
+(function () {
+  let ph = 'Death', ou = 'W';
+  const outs = [['0', 'Dot', 0, 0], ['1', 'Single', 1, 0], ['4', 'Four', 4, 0], ['6', 'Six', 6, 0], ['W', 'Wicket', 0, 1]];
+  const draw = () => {
+    $('#phBtns').innerHTML = ['Powerplay', 'Middle', 'Death'].map(p => `<button class="o" data-p="${p}" aria-pressed="${p === ph}">${p}</button>`).join('');
+    $('#ouBtns').innerHTML = outs.map(o => `<button class="o" data-o="${o[0]}" aria-pressed="${o[0] === ou}">${o[1]}</button>`).join('');
+    const e = D.phases[ph], o = outs.find(x => x[0] === ou), er = e.er, ew = e.ew / 100, C = e.C, W = o[3];
+    const V = (o[2] - er) - C * (W - ew);
+    $('#calcF').innerHTML = `V = (${o[2]} &minus; ${er.toFixed(2)}) &minus; ${C.toFixed(1)} &times; (${W} &minus; ${ew.toFixed(3)})<br>expected runs ${er.toFixed(2)} &middot; wicket chance ${e.ew}% &middot; wicket cost ${C.toFixed(1)} runs`;
+    const r = $('#calcR'); r.textContent = sgn(V) + ' runs'; r.className = 'res ' + (V >= 0 ? 'pos' : 'neg');
+    $('#calcT').textContent = V >= 0 ? 'Better than an average ball in this phase.' : 'Worse than an average ball in this phase' + (W ? `: a wicket costs ${C.toFixed(1)} runs in this phase. Early wickets cost more because more of the innings is still to play.` : '.');
+    $$('#phBtns button').forEach(b => b.onclick = () => { ph = b.dataset.p; draw(); }); $$('#ouBtns button').forEach(b => b.onclick = () => { ou = b.dataset.o; draw(); });
+  };
+  draw();
+})();
+
+/* evidence */
+let evS = 'bat', evT = 'Elev+';
+const PN = [['level', 'Pressure rating (ours)'], ['naive_overall_mean', 'Raw overall average'], ['naive_pressure_mean', 'Raw pressure-only average'], ['delta', 'Change from own baseline'], ['cons', 'Hit-rate consistency']];
+function renderEv() {
+  const svg = $('#evChart'); svg.innerHTML = '';
+  const get = (k, pr) => (D.val.find(v => v.kind === k && v.side === evS && v.tier === evT && v.pred === pr) || {}).rho;
+  const W = 700, ml = 190, mr = 50, rowH = 46, mt = 10, lo = -0.35, hi = 0.4; const X = v => ml + (v - lo) / (hi - lo) * (W - ml - mr);
+  [-0.3, -0.2, -0.1, 0, 0.1, 0.2, 0.3, 0.4].forEach(t => { svgEl('line', { x1: X(t), x2: X(t), y1: mt, y2: mt + PN.length * rowH, class: t === 0 ? 'diag' : 'axis' }, svg); svgEl('text', { x: X(t), y: mt + PN.length * rowH + 16, 'text-anchor': 'middle' }, svg).textContent = t.toFixed(1); });
+  PN.forEach(([pr, lab], i) => {
+    const y = mt + i * rowH, a = get('random-split mean', pr), t = get('temporal', pr), our = pr === 'level';
+    svgEl('text', { x: ml - 10, y: y + rowH / 2 + 4, 'text-anchor': 'end', style: our ? 'fill:var(--ink);font-weight:500;font-family:var(--body);font-size:12.5px' : 'font-family:var(--body);font-size:12.5px' }, svg).textContent = lab;
+    if (a != null) { svgEl('rect', { x: Math.min(X(0), X(a)), y: y + 10, width: Math.abs(X(a) - X(0)), height: 20, rx: 3, fill: our ? 'var(--accent)' : 'var(--ink3)', 'fill-opacity': our ? 1 : 0.55 }, svg);
+      svgEl('text', { x: a >= 0 ? X(a) + 6 : X(a) - 6, y: y + 25, 'text-anchor': a >= 0 ? 'start' : 'end', style: 'fill:var(--ink)' }, svg).textContent = sgn(a); }
+    if (t != null) svgEl('rect', { x: X(t) - 5, y: y + 15, width: 10, height: 10, transform: `rotate(45 ${X(t)} ${y + 20})`, fill: 'var(--warn)', stroke: 'var(--surface)', 'stroke-width': 1.5 }, svg);
+  });
+  const n = (D.val.find(v => v.kind === 'random-split mean' && v.side === evS && v.tier === evT) || {}).n;
+  $('#evN').textContent = 'About ' + Math.round(n) + ' players per test. Higher is better; zero means no predictive value.';
+}
+toggleGroup($('#evSide'), 's', s => { evS = s; renderEv(); renderStab(); }); toggleGroup($('#evTier'), 't', t => { evT = t; renderEv(); });
+function renderStab() {
+  const svg = $('#stab'); svg.innerHTML = ''; const L = D[evS].slice(0, 15), ml = 140, W = 520, rh = 24; const X = v => ml + v * (W - ml - 40);
+  [0, .25, .5, .75, 1].forEach(t => { svgEl('line', { x1: X(t), x2: X(t), y1: 0, y2: L.length * rh, class: t === .5 ? 'diag' : 'axis' }, svg); svgEl('text', { x: X(t), y: L.length * rh + 16, 'text-anchor': 'middle' }, svg).textContent = Math.round(t * 100) + '%'; });
+  const col = evS === 'bat' ? 'var(--accent)' : 'var(--blue)';
+  L.forEach((p, i) => { const y = i * rh;
+    svgEl('text', { x: ml - 8, y: y + 16, 'text-anchor': 'end', style: 'font-family:var(--body);font-size:12px' }, svg).textContent = p.rank + '. ' + p.name;
+    const r = svgEl('rect', { x: ml, y: y + 4, width: Math.max(2, p.pt10 * (W - ml - 40)), height: 14, rx: 2, fill: p.rank <= 10 ? col : 'var(--ink3)', 'fill-opacity': p.rank <= 10 ? 1 : 0.5 }, svg);
+    svgEl('text', { x: X(p.pt10) + 6, y: y + 16, style: 'fill:var(--ink)' }, svg).textContent = Math.round(p.pt10 * 100) + '%'; });
+  svg.setAttribute('viewBox', `0 0 520 ${L.length * rh + 26}`);
+}
+renderEv(); renderStab();
+const sl = { 'default': 'Final settings', 'alpha x3': 'Ridge strength x3', 'alpha /3': 'Ridge strength / 3', 'no pressure re-weight (k=0)': 'No pressure up-weighting', 'slope f=1': 'Looser pressure slope', 'level only': 'Rating only (final)', '0.8/0/0.2': 'Add 20% consistency', '0.5/0.25/0.25': 'Add delta and consistency (50/25/25)' };
+const byS = {}; D.sens.forEach(r => { (byS[r.setting] = byS[r.setting] || {})[r.side] = r.top10_overlap; });
+$('#sensBody').innerHTML = Object.keys(byS).filter(k => k !== 'default' && k !== 'level only').map(k => `<tr><td>${sl[k] || k}</td><td class="num">${byS[k].bat}/10</td><td class="num">${byS[k].bowl}/10</td></tr>`).join('');
+</script>

@@ -1,0 +1,547 @@
+<title>Pressure Ledger</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,500..900&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: broadcast-scoreboard feel. Sticky section nav, wide hero with a two-row scorecard, then one band per question
+   (who ranks, who is where, what counts as pressure, how scored, did it hold up, what can go wrong). */
+:root {
+  --bg: #F1F2F8;
+  --surface: #FFFFFF;
+  --surface2: #E8EAF5;
+  --ink: #0D1230;
+  --ink2: #4A5072;
+  --ink3: #7A80A0;
+  --line: #D9DCEB;
+  --accent: #D81B73;       /* batters */
+  --accent-soft: #FBE1ED;
+  --blue: #2747E0;         /* bowlers */
+  --blue-soft: #E0E6FD;
+  --good: #0E8F5A;
+  --warn: #B86E00;
+  --bad: #C4302B;
+  --display: "Archivo", "Arial Narrow", system-ui, sans-serif;
+  --body: "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --mono: "JetBrains Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0A0D1F; --surface: #12162E; --surface2: #1A1F3D; --ink: #EEF0FB; --ink2: #A8AED0; --ink3: #7E85AD; --line: #262B4D;
+    --accent: #FF4D9A; --accent-soft: #3A1530; --blue: #8CA0FF; --blue-soft: #1B2457; --good: #3DD598; --warn: #F0A23A; --bad: #FF6B63;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0A0D1F; --surface: #12162E; --surface2: #1A1F3D; --ink: #EEF0FB; --ink2: #A8AED0; --ink3: #7E85AD; --line: #262B4D;
+  --accent: #FF4D9A; --accent-soft: #3A1530; --blue: #8CA0FF; --blue-soft: #1B2457; --good: #3DD598; --warn: #F0A23A; --bad: #FF6B63;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+html { scroll-behavior: smooth; }
+body { background: var(--bg); color: var(--ink); font-family: var(--body); font-size: 15px; line-height: 1.55; }
+.wrap { max-width: 1120px; margin-inline: auto; padding-inline: max(16px, env(safe-area-inset-left, 0px)) max(16px, env(safe-area-inset-right, 0px)); }
+h1, h2, h3 { font-family: var(--display); font-stretch: 108%; letter-spacing: -0.01em; text-wrap: balance; margin: 0; line-height: 1.04; }
+h1 { font-size: clamp(2.4rem, 6.4vw, 4.6rem); font-weight: 850; }
+h2 { font-size: clamp(1.7rem, 3.6vw, 2.5rem); font-weight: 800; }
+h3 { font-size: 1.15rem; font-weight: 750; line-height: 1.2; }
+p { margin: 0; }
+.mono, .num { font-family: var(--mono); font-variant-numeric: tabular-nums; }
+.eyebrow { font-family: var(--mono); font-size: 0.72rem; letter-spacing: 0.14em; text-transform: uppercase; color: var(--ink3); }
+.lede { font-size: 1.1rem; color: var(--ink2); max-width: 62ch; }
+.muted { color: var(--ink2); }
+a { color: inherit; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 4px; }
+
+/* nav */
+.top { position: sticky; top: env(safe-area-inset-top, 0px); z-index: 20; background: color-mix(in srgb, var(--bg) 88%, transparent); backdrop-filter: blur(10px); border-bottom: 1px solid var(--line); }
+body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-area-inset-top, 0px); z-index: 30; background: var(--bg); }
+.top .wrap { display: flex; align-items: center; gap: 20px; height: 52px; }
+.brand { font-family: var(--display); font-stretch: 112%; font-weight: 850; letter-spacing: -0.01em; white-space: nowrap; }
+.brand i { font-style: normal; color: var(--accent); }
+.top nav { display: flex; gap: 4px; overflow-x: auto; scrollbar-width: none; margin-left: auto; }
+.top nav a { text-decoration: none; font-size: 0.85rem; color: var(--ink2); padding: 6px 10px; border-radius: 6px; white-space: nowrap; }
+.top nav a:hover { background: var(--surface2); color: var(--ink); }
+
+/* hero */
+.hero { padding-block: 56px 40px; }
+.hero-grid { display: grid; grid-template-columns: 1.25fr 1fr; gap: 40px; align-items: end; }
+.hero h1 em { font-style: normal; color: var(--accent); }
+.hero .lede { margin-top: 20px; }
+.score { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; overflow: hidden; }
+.score header { display: flex; justify-content: space-between; padding: 10px 16px; background: var(--ink); color: var(--bg); font-family: var(--mono); font-size: 0.7rem; letter-spacing: 0.12em; text-transform: uppercase; }
+.score .srow { display: grid; grid-template-columns: 28px 1fr auto; gap: 12px; align-items: center; padding: 12px 16px; border-top: 1px solid var(--line); }
+.score .srow:first-of-type { border-top: 0; }
+.score .rk { font-family: var(--mono); font-size: 0.8rem; color: var(--ink3); }
+.score .nm { font-weight: 600; }
+.score .vl { font-family: var(--mono); font-size: 0.9rem; font-weight: 500; }
+.score .tag { font-size: 0.68rem; font-family: var(--mono); letter-spacing: 0.1em; text-transform: uppercase; padding: 2px 6px; border-radius: 4px; }
+.tag.bat { background: var(--accent-soft); color: var(--accent); }
+.tag.bowl { background: var(--blue-soft); color: var(--blue); }
+.stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 0; margin-top: 40px; border-block: 1px solid var(--line); }
+.stats div { padding: 18px 16px; border-left: 1px solid var(--line); }
+.stats div:first-child { border-left: 0; padding-left: 0; }
+.stats b { display: block; font-family: var(--display); font-stretch: 108%; font-size: clamp(1.6rem, 3.4vw, 2.3rem); font-weight: 800; line-height: 1; }
+.stats span { font-size: 0.8rem; color: var(--ink2); }
+
+/* bands */
+section.band { padding-block: 72px; border-top: 1px solid var(--line); }
+.band-head { display: grid; gap: 14px; margin-bottom: 32px; max-width: 70ch; }
+.toggle { display: inline-flex; background: var(--surface2); border-radius: 10px; padding: 3px; gap: 2px; }
+.toggle button { appearance: none; border: 0; background: transparent; color: var(--ink2); font: 600 0.85rem var(--body); padding: 8px 14px; border-radius: 8px; cursor: pointer; }
+.toggle button[aria-pressed="true"] { background: var(--surface); color: var(--ink); box-shadow: 0 1px 3px rgba(13, 18, 48, 0.15); }
+.bar-row { display: flex; flex-wrap: wrap; gap: 16px; align-items: center; justify-content: space-between; margin-bottom: 18px; }
+
+/* ranking list */
+.rank { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.rank details { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; }
+.rank summary { list-style: none; cursor: pointer; display: grid; grid-template-columns: 44px minmax(0, 1.1fr) minmax(0, 1.4fr) auto 24px; gap: 16px; align-items: center; padding: 14px 16px; }
+.rank summary::-webkit-details-marker { display: none; }
+.rank .n { font-family: var(--display); font-stretch: 112%; font-size: 1.9rem; font-weight: 850; color: var(--ink3); line-height: 1; }
+.rank details:nth-child(-n+3) .n { color: var(--side); }
+.rank .who b { display: block; font-weight: 600; font-size: 1rem; }
+.rank .who span { font-size: 0.78rem; color: var(--ink2); }
+.meter { display: grid; gap: 4px; }
+.meter .track { height: 10px; background: var(--surface2); border-radius: 3px; overflow: hidden; }
+.meter .fill { height: 100%; background: var(--side); border-radius: 0 3px 3px 0; }
+.meter .val { font-family: var(--mono); font-size: 0.8rem; color: var(--ink2); }
+.meter .val b { color: var(--ink); font-weight: 500; }
+.chip { font-family: var(--mono); font-size: 0.74rem; padding: 4px 9px; border-radius: 99px; white-space: nowrap; border: 1px solid var(--line); color: var(--ink2); }
+.chip.solid { background: color-mix(in srgb, var(--good) 14%, var(--surface)); border-color: color-mix(in srgb, var(--good) 40%, var(--line)); color: var(--good); }
+.chip.mid { background: color-mix(in srgb, var(--warn) 12%, var(--surface)); border-color: color-mix(in srgb, var(--warn) 40%, var(--line)); color: var(--warn); }
+.chip.edge { background: color-mix(in srgb, var(--bad) 10%, var(--surface)); border-color: color-mix(in srgb, var(--bad) 38%, var(--line)); color: var(--bad); }
+.chev { width: 10px; height: 10px; border-right: 2px solid var(--ink3); border-bottom: 2px solid var(--ink3); transform: rotate(45deg); transition: transform 0.15s; justify-self: center; }
+details[open] .chev { transform: rotate(-135deg); }
+.detail { padding: 4px 16px 18px 76px; display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 14px 20px; }
+.kv small { display: block; font-size: 0.72rem; color: var(--ink3); text-transform: uppercase; letter-spacing: 0.08em; font-family: var(--mono); }
+.kv b { font-family: var(--mono); font-weight: 500; font-size: 1.05rem; }
+.kv span { font-size: 0.78rem; color: var(--ink2); display: block; }
+.note { margin-top: 16px; font-size: 0.85rem; color: var(--ink2); max-width: 80ch; }
+.rank-wrap { --side: var(--accent); }
+.rank-wrap[data-side="bowl"] { --side: var(--blue); }
+
+/* explorer */
+.explorer { display: grid; grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr); gap: 24px; align-items: start; }
+.panel { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 20px; }
+.chart svg { width: 100%; height: auto; display: block; overflow: visible; }
+.chart text { fill: var(--ink2); font-family: var(--mono); font-size: 11px; }
+.chart .axis { stroke: var(--line); stroke-width: 1; }
+.chart .diag { stroke: var(--ink3); stroke-dasharray: 4 4; stroke-width: 1; }
+.pt { cursor: pointer; }
+.pt circle { transition: r 0.1s; }
+.tip { position: fixed; pointer-events: none; z-index: 40; background: var(--ink); color: var(--bg); font-size: 0.78rem; padding: 7px 10px; border-radius: 8px; max-width: 260px; opacity: 0; transition: opacity 0.1s; }
+.tip.on { opacity: 1; }
+.search { display: flex; gap: 8px; margin-bottom: 14px; }
+.search input { flex: 1; min-width: 0; font: 500 0.9rem var(--body); padding: 10px 12px; border: 1px solid var(--line); border-radius: 8px; background: var(--bg); color: var(--ink); }
+.pcard h3 { font-size: 1.5rem; margin-bottom: 4px; }
+.pcard .sub { color: var(--ink2); font-size: 0.85rem; margin-bottom: 16px; }
+.pcard .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px 18px; }
+.legend { display: flex; gap: 16px; flex-wrap: wrap; font-size: 0.8rem; color: var(--ink2); margin-top: 10px; }
+.legend i { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 6px; vertical-align: -1px; }
+
+/* pressure tiers */
+.tiers { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }
+.tier { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 16px; border-top: 4px solid color-mix(in srgb, var(--accent) var(--t), var(--surface2)); }
+.tier b { font-family: var(--display); font-stretch: 108%; font-size: 1.2rem; font-weight: 800; }
+.tier .rng { font-family: var(--mono); font-size: 0.78rem; color: var(--ink2); margin: 2px 0 10px; display: block; }
+.tier p { font-size: 0.85rem; color: var(--ink2); }
+.two { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 24px; margin-top: 24px; }
+.three { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; }
+.hero-grid > *, .explorer > *, .two > *, .three > *, .steps > *, .tiers > * { min-width: 0; }
+.formula.wrap { white-space: normal; }
+.formula { font-family: var(--mono); font-size: 0.85rem; background: var(--surface2); border-radius: 8px; padding: 12px 14px; overflow-x: auto; margin-top: 10px; white-space: nowrap; }
+
+/* method */
+.steps { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; counter-reset: s; }
+.step { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 18px; display: grid; gap: 8px; align-content: start; }
+.step .tagline { font-family: var(--mono); font-size: 0.7rem; letter-spacing: 0.1em; text-transform: uppercase; color: var(--accent); }
+.step p { font-size: 0.86rem; color: var(--ink2); }
+.step .big { font-family: var(--display); font-stretch: 108%; font-weight: 800; font-size: 1.7rem; }
+.calc button.o { appearance: none; border: 1px solid var(--line); background: var(--surface); color: var(--ink); font: 500 0.85rem var(--mono); padding: 8px 12px; border-radius: 8px; cursor: pointer; }
+.calc button.o[aria-pressed="true"] { background: var(--ink); color: var(--bg); border-color: var(--ink); }
+.calc .row { display: flex; gap: 8px; flex-wrap: wrap; margin: 8px 0 14px; }
+.calc .res { font-family: var(--display); font-stretch: 108%; font-size: 2.6rem; font-weight: 850; line-height: 1; }
+.calc .res.pos { color: var(--good); } .calc .res.neg { color: var(--bad); }
+
+/* evidence */
+.finding { display: grid; gap: 6px; background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 18px; }
+.finding .st { font-family: var(--mono); font-size: 0.7rem; letter-spacing: 0.1em; text-transform: uppercase; }
+.st.keep { color: var(--good); } .st.drop { color: var(--bad); } .st.note { color: var(--warn); }
+.finding p { font-size: 0.86rem; color: var(--ink2); }
+table { border-collapse: collapse; width: 100%; font-size: 0.85rem; }
+th, td { text-align: left; padding: 9px 10px; border-bottom: 1px solid var(--line); }
+th { font-family: var(--mono); font-size: 0.7rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--ink3); font-weight: 500; }
+td.num { text-align: right; } th.num { text-align: right; }
+.scroll { overflow-x: auto; }
+ul.limits { margin: 0; padding: 0; list-style: none; display: grid; gap: 10px; }
+ul.limits li { background: var(--surface); border: 1px solid var(--line); border-left: 4px solid var(--warn); border-radius: 8px; padding: 12px 16px; font-size: 0.9rem; }
+ul.limits b { font-weight: 600; }
+footer { border-top: 1px solid var(--line); padding-block: 32px 56px; color: var(--ink2); font-size: 0.85rem; }
+
+@media (max-width: 860px) {
+  .hero-grid, .explorer, .two { grid-template-columns: minmax(0, 1fr); }
+  .tiers, .steps { grid-template-columns: repeat(2, 1fr); }
+  .three { grid-template-columns: 1fr; }
+  .stats { grid-template-columns: repeat(2, 1fr); }
+  .stats div:nth-child(3) { border-left: 0; padding-left: 0; }
+  .rank summary { grid-template-columns: 34px minmax(0, 1fr) 20px; }
+  .rank summary .meter, .rank summary .chip { grid-column: 2 / 3; }
+  .rank summary .chev { grid-row: 1; grid-column: 3; }
+  .detail { padding-left: 16px; }
+  .top nav a:nth-child(n+5) { display: none; }
+}
+@media (max-width: 520px) { .tiers, .steps { grid-template-columns: 1fr; } .band { padding-block: 52px; } }
+@media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } * { transition: none !important; } }
+</style>
+
+<header class="top"><div class="wrap">
+  <div class="brand">Pressure <i>Ledger</i></div>
+  <nav aria-label="Sections"><a href="#rankings">Rankings</a><a href="#explorer">Explorer</a><a href="#pressure">Pressure</a><a href="#method">Method</a><a href="#evidence">Evidence</a><a href="#limits">Limits</a></nav>
+</div></header>
+
+<main>
+<section class="hero"><div class="wrap">
+  <div class="hero-grid">
+    <div>
+      <div class="eyebrow">SupeRR Selector Season 2 &middot; Round 1</div>
+      <h1 style="margin-top:14px">Who holds their nerve when the <em>match is on the line?</em></h1>
+      <p class="lede">We rated every IPL and T20I batter and bowler since 2022 on what they do in the highest-leverage balls, measured against what an average player does in the same situation.</p>
+    </div>
+    <div class="score" aria-label="Top of each list">
+      <header><span>Top of the ledger</span><span>runs / over above average</span></header>
+      <div id="heroRows"></div>
+    </div>
+  </div>
+  <div class="stats" id="stats"></div>
+</div></section>
+
+<section class="band" id="rankings"><div class="wrap">
+  <div class="band-head">
+    <div class="eyebrow">The answer</div>
+    <h2>Top 10 under pressure</h2>
+    <p class="lede">Rating is the estimated runs per over a player gains over an average player in the same match state, after adjusting for opponent, role and thin samples. Open a row for the evidence.</p>
+  </div>
+  <div class="bar-row">
+    <div class="toggle" role="group" aria-label="List"><button data-s="bat" aria-pressed="true">Batters</button><button data-s="bowl" aria-pressed="false">Bowlers</button></div>
+    <div class="legend"><span><i style="background:var(--good)"></i>Stays in top 10 in 75%+ of bootstrap runs</span><span><i style="background:var(--warn)"></i>50 to 75%</span><span><i style="background:var(--bad)"></i>Under 50%: edge of the list</span></div>
+  </div>
+  <div class="rank-wrap" id="rankWrap" data-side="bat"><ol class="rank" id="rankList"></ol></div>
+  <p class="note" id="rankNote"></p>
+</div></section>
+
+<section class="band" id="explorer"><div class="wrap">
+  <div class="band-head">
+    <div class="eyebrow">All 185 eligible players</div>
+    <h2>Pressure versus ordinary</h2>
+    <p class="lede" id="expLede"></p>
+  </div>
+  <div class="bar-row">
+    <div class="toggle" role="group" aria-label="Player type"><button data-s="bat" aria-pressed="true">Batters</button><button data-s="bowl" aria-pressed="false">Bowlers</button></div>
+  </div>
+  <div class="explorer">
+    <div class="panel chart"><svg id="scatter" viewBox="0 0 640 440" role="img" aria-label="Scatter of pressure versus ordinary performance for every eligible player"></svg>
+      <div class="legend"><span><i style="background:var(--accent)" id="lgTop"></i>Top 10</span><span><i style="background:var(--ink3)"></i>Other eligible players</span><span id="lgHint"></span></div></div>
+    <div class="panel pcard">
+      <div class="search"><input id="pSearch" list="pList" placeholder="Search a player" aria-label="Search a player"><datalist id="pList"></datalist></div>
+      <div id="pCard"></div>
+    </div>
+  </div>
+</div></section>
+
+<section class="band" id="pressure"><div class="wrap">
+  <div class="band-head">
+    <div class="eyebrow">Definition</div>
+    <h2>Pressure is how much the next ball can swing the match</h2>
+    <p class="lede">Required rate, wickets in hand and overs left interact: 12 an over is routine with eight wickets in hand and desperate with three. So we let a win-probability model combine them, then measure how much each ball can move it.</p>
+  </div>
+  <div class="steps" style="grid-template-columns:repeat(3,minmax(0,1fr))">
+    <div class="step"><span class="tagline">Model</span><div class="big mono" id="auc2"></div><p>Out-of-fold AUC for chases. Every ball is scored by a model that never saw its match. First innings reaches 0.68, so those balls count at half weight.</p></div>
+    <div class="step"><span class="tagline">Leverage</span><div class="big">Expected swing</div><p>Apply each outcome (dot, 1 to 6, wicket) weighted by how often it happens in that phase, and average the absolute change in win probability.</p></div>
+    <div class="step"><span class="tagline">Live balls only</span><div class="big">3% to 97%</div><p>Balls where the game is already decided are excluded from ratings. Among the rest, leverage is ranked within each innings and cut into four tiers.</p></div>
+  </div>
+  <div class="two">
+    <div class="panel chart">
+      <h3>Where the pressure sits in a chase</h3>
+      <p class="muted" style="font-size:.85rem;margin:6px 0 12px">Average win-probability swing of the next ball, by over and the chasing side's win probability. Hover a cell.</p>
+      <svg id="heat" viewBox="0 0 560 270" role="img" aria-label="Heat map of leverage by over and chasing side win probability"></svg>
+    </div>
+    <div class="panel chart">
+      <div class="bar-row" style="margin-bottom:6px"><h3>Pressure changes how innings go</h3>
+        <div class="toggle" role="group" aria-label="Metric" id="tierToggle"><button data-m="dot" aria-pressed="true">Dots</button><button data-m="wkt" aria-pressed="false">Wickets</button><button data-m="bdy" aria-pressed="false">Boundaries</button></div></div>
+      <p class="muted" style="font-size:.85rem;margin-bottom:10px">Share of legal deliveries, league-wide, by pressure tier.</p>
+      <svg id="tierChart" viewBox="0 0 520 250" role="img" aria-label="Outcome rates by pressure tier"></svg>
+    </div>
+  </div>
+  <div class="tiers" style="margin-top:24px" id="tierCards"></div>
+  <div class="two">
+    <div class="panel"><h3>Pressure has a direction</h3>
+      <p class="muted" style="margin-top:8px;font-size:.9rem">A batter is more pressured when his side is behind, a bowler when the batting side is ahead. A 50-50 game weighs both equally.</p>
+      <div class="formula">batter weight = 0.6 + 0.8 &times; (1 &minus; win prob)<br>bowler weight = 0.6 + 0.8 &times; win prob</div></div>
+    <div class="panel"><h3>Four tiers, one rule</h3>
+      <p class="muted" style="margin-top:8px;font-size:.9rem">Leverage percentile within each innings, among live balls. Ratings weight balls by intensity, so High and Extreme balls drive the estimate, while Ordinary and Elevated balls anchor each player's usual level.</p></div>
+  </div>
+</div></section>
+
+<section class="band" id="method"><div class="wrap">
+  <div class="band-head">
+    <div class="eyebrow">Scoring</div>
+    <h2>Every ball is scored against its own situation</h2>
+    <p class="lede">Win probability only defines pressure. Players are scored in runs, because run value predicted next-season form where win-probability credit did not.</p>
+  </div>
+  <div class="steps">
+    <div class="step"><span class="tagline">1 &middot; Expect</span><div class="big">State models</div><p>Gradient-boosted models predict the runs, the wicket chance and the cost of a wicket for an average player in the same state: overs, wickets, target.</p></div>
+    <div class="step"><span class="tagline">2 &middot; Value</span><div class="big">V per ball</div><p>Runs above expected, minus the expected-runs cost of any wicket above its expected chance.</p></div>
+    <div class="step"><span class="tagline">3 &middot; Rate</span><div class="big">Crossed ridge</div><p>One model explains V with a batter effect and a bowler effect, plus batting slot and pace/spin. It controls for opponent and shrinks thin samples.</p></div>
+    <div class="step"><span class="tagline">4 &middot; Check</span><div class="big">Bootstrap</div><p>100 resamples of matches rerun the whole pipeline to give each player a probability of staying in the top 10.</p></div>
+  </div>
+  <div class="two">
+    <div class="panel calc">
+      <h3>Value of one ball</h3>
+      <p class="muted" style="font-size:.85rem;margin-top:6px">League-average expectations from this data. Pick a phase and an outcome.</p>
+      <div class="row" id="phBtns" role="group" aria-label="Phase"></div>
+      <div class="row" id="ouBtns" role="group" aria-label="Outcome"></div>
+      <div class="formula wrap" id="calcF"></div>
+      <div style="margin-top:14px"><div class="res" id="calcR"></div><div class="muted" id="calcT" style="font-size:.85rem;margin-top:4px"></div></div>
+    </div>
+    <div class="panel"><h3>What goes into the rating</h3>
+      <div style="margin-top:12px;display:grid;gap:10px;font-size:.9rem">
+        <div><b>Opponent.</b> <span class="muted">A batter is credited relative to the bowlers he faced, and a bowler relative to the batters he bowled to.</span></div>
+        <div><b>Role.</b> <span class="muted">Batting slot (1-2, 3-4, 5-6, 7+) and pace versus spin are controlled for.</span></div>
+        <div><b>Competition.</b> <span class="muted">Emerging Teams and Rising Stars matches count at half weight.</span></div>
+        <div><b>Exclusions.</b> <span class="muted">Rain-affected matches, ties, no-results, super overs, run-outs and retirements.</span></div>
+        <div><b>Shrinkage.</b> <span class="muted">Ridge penalties pull thin-sample players toward average. The typical player has only 15 to 25 balls in the top tiers.</span></div>
+      </div>
+      <div class="formula">rating = baseline + shrunk pressure slope</div>
+    </div>
+  </div>
+</div></section>
+
+<section class="band" id="evidence"><div class="wrap">
+  <div class="band-head">
+    <div class="eyebrow">Evidence</div>
+    <h2>We tested what predicts pressure performance we hadn't seen</h2>
+    <p class="lede">Fit on half the matches, then check how well each score ranks players on pressure balls in the other half. Ten random splits, plus one chronological test (fit on 2022 to 2024, test on 2025 to 2026).</p>
+  </div>
+  <div class="bar-row">
+    <div class="toggle" role="group" aria-label="List" id="evSide"><button data-s="bat" aria-pressed="true">Batters</button><button data-s="bowl" aria-pressed="false">Bowlers</button></div>
+    <div class="toggle" role="group" aria-label="Tier" id="evTier"><button data-t="Elev+" aria-pressed="true">Elevated + High + Extreme</button><button data-t="High+" aria-pressed="false">High + Extreme only</button></div>
+  </div>
+  <div class="panel chart"><svg id="evChart" viewBox="0 0 700 270" role="img" aria-label="Held-out rank correlation by score"></svg>
+    <div class="legend"><span><i style="background:var(--ink2);border-radius:2px"></i>Average over 10 random splits</span><span><span style="display:inline-block;width:9px;height:9px;background:var(--warn);transform:rotate(45deg);margin-right:7px"></span>Chronological test</span><span id="evN"></span></div></div>
+  <div class="three" style="margin-top:20px">
+    <div class="finding"><span class="st keep">Kept</span><h3>Baseline skill on pressure-weighted balls</h3><p>The only signal that predicted held-out pressure results. Adjusted for opponent and role, and shrunk for small samples.</p></div>
+    <div class="finding"><span class="st drop">Dropped</span><h3>Pressure slope and hit-rate</h3><p>Change from a player's own baseline and match-by-match hit rate did not predict held-out results, so neither drives the ranking. Both are shown as diagnostics.</p></div>
+    <div class="finding"><span class="st drop">Dropped</span><h3>Win-probability credit as the score</h3><p>It drifted by &minus;1.0 points per 100 balls in the Extreme tier and barely persisted across seasons (&rho; about 0.1 for batters).</p></div>
+  </div>
+  <div class="two">
+    <div class="panel chart"><div class="bar-row" style="margin-bottom:4px"><h3>How often each player stays in the top 10</h3></div>
+      <p class="muted" style="font-size:.85rem;margin-bottom:10px">Share of 100 match-level bootstrap runs. Top 15 shown for the selected list above.</p>
+      <svg id="stab" viewBox="0 0 520 380" role="img" aria-label="Bootstrap top-10 probability"></svg></div>
+    <div class="panel"><h3>Sensitivity of the top 10</h3>
+      <p class="muted" style="font-size:.85rem;margin:6px 0 12px">Names unchanged out of 10 when one setting changes.</p>
+      <div class="scroll"><table><thead><tr><th>Change</th><th class="num">Batters</th><th class="num">Bowlers</th></tr></thead><tbody id="sensBody"></tbody></table></div></div>
+  </div>
+</div></section>
+
+<section class="band" id="limits"><div class="wrap">
+  <div class="band-head">
+    <div class="eyebrow">Read with care</div>
+    <h2>Where the model is less certain</h2>
+  </div>
+  <ul class="limits">
+    <li><b>Pressure-specific skill is hard to detect.</b> Only baseline skill predicted future pressure results, so the ranking rests on that. We do not claim a measurable clutch gene.</li>
+    <li><b>Batters in the top tiers are the least predictable.</b> Held-out correlation for batters in the High and Extreme tiers is near zero (+0.02). Read batter order within the top 10 as a tier. Bowlers are more reliable (+0.12).</li>
+    <li><b>Thin samples at the edge.</b> Several players have fewer than 80 pressure balls. Shrinkage and the bootstrap account for it, but a few more matches could move them. Places 8 to 10 in both lists are close calls.</li>
+    <li><b>First-innings pressure is approximate.</b> The first-innings win-probability model is weaker (AUC 0.68), so those balls count at half weight.</li>
+    <li><b>Missing context.</b> Pitch, dew, partnerships and batting-order decisions are not modelled. Players who appear in only one competition are linked to others through shared opponents.</li>
+    <li><b>Settings were tuned on this data.</b> Sensitivity checks show the effect is modest, but the final lists are not independently validated.</li>
+  </ul>
+</div></section>
+</main>
+
+<footer><div class="wrap"><div id="foot"></div>
+  <p style="margin-top:8px">Built for the Rajasthan Royals SupeRR Selector Season 2 hackathon. An independent student submission, not an official Rajasthan Royals product.</p></div></footer>
+<div class="tip" id="tip" role="tooltip"></div>
+
+<script type="application/json" id="data">__DATA__</script>
+<script>
+const D = JSON.parse(document.getElementById('data').textContent);
+const $ = (s, r = document) => r.querySelector(s), $$ = (s, r = document) => [...r.querySelectorAll(s)];
+const NS = 'http://www.w3.org/2000/svg';
+const tip = $('#tip');
+const sgn = (x, d = 2) => (x >= 0 ? '+' : '−') + Math.abs(x).toFixed(d);
+function showTip(e, html) { tip.innerHTML = html; tip.classList.add('on'); const w = tip.offsetWidth; let x = e.clientX + 14, y = e.clientY + 14; if (x + w > innerWidth - 8) x = e.clientX - w - 14; tip.style.left = x + 'px'; tip.style.top = y + 'px'; }
+function hideTip() { tip.classList.remove('on'); }
+function svgEl(tag, attrs = {}, parent) { const e = document.createElementNS(NS, tag); for (const k in attrs) e.setAttribute(k, attrs[k]); if (parent) parent.appendChild(e); return e; }
+function toggleGroup(root, attr, cb) { $$('button', root).forEach(b => b.addEventListener('click', () => { $$('button', root).forEach(x => x.setAttribute('aria-pressed', x === b)); cb(b.dataset[attr]); })); }
+
+/* hero + stats */
+const m = D.meta;
+$('#heroRows').innerHTML = [['bat', D.bat[0]], ['bat', D.bat[1]], ['bowl', D.bowl[0]], ['bowl', D.bowl[1]]].map(([s, p]) =>
+  `<div class="srow"><span class="rk">#${p.rank}</span><span><span class="nm">${p.name}</span> <span class="tag ${s}">${s === 'bat' ? 'Bat' : 'Bowl'}</span></span><span class="vl">${sgn(p.rating)}</span></div>`).join('');
+$('#stats').innerHTML = [[m.matches, 'clean matches, ' + m.ipl + ' IPL and ' + m.t20i + ' T20I'], [Math.round(m.balls / 1000) + 'k', 'deliveries scored'], [D.bat.length + D.bowl.length, 'players eligible to rank'], ['0.89', 'win-probability AUC in chases']].map(([a, b]) => `<div><b>${a}</b><span>${b}</span></div>`).join('');
+$('#auc2').textContent = 'AUC 0.89';
+$('#foot').textContent = 'Data window: ' + m.first + ' to ' + m.last + '. IPL 2022 to 2026 and T20Is from 2022. Rain-affected, tied and no-result matches and super overs removed.';
+
+/* ranking */
+function detailHTML(p, s) {
+  const kv = (a, b, c) => `<div class="kv"><small>${a}</small><b>${b}</b>${c ? `<span>${c}</span>` : ''}</div>`;
+  const rows = s === 'bat' ? [
+    kv('Strike rate', p.p.toFixed(0) + ' vs ' + p.o.toFixed(0), 'pressure vs ordinary'),
+    kv('Boundary share', p.bdy.toFixed(1) + '%', 'of balls faced under pressure'),
+    kv('Dismissal rate', p.out.toFixed(1) + '%', 'of balls under pressure'),
+    kv('Runs above expected', sgn(p.rae), 'per over under pressure, raw')
+  ] : [
+    kv('Economy', p.p.toFixed(2) + ' vs ' + p.o.toFixed(2), 'pressure vs ordinary'),
+    kv('Dot-ball share', p.dot.toFixed(1) + '%', 'of balls under pressure'),
+    kv('Wicket rate', p.out.toFixed(1) + '%', 'of balls under pressure'),
+    kv('Runs saved', sgn(p.rae), 'per over under pressure, raw')
+  ];
+  rows.push(kv('Pressure sample', p.pb + ' balls', p.pm + ' matches'));
+  rows.push(kv('Rating band', sgn(p.z10, 1) + ' to ' + sgn(p.z90, 1), '10th to 90th pct of bootstrap, z-score'));
+  rows.push(kv('Naive rank', '#' + p.naive, (s === 'bat' ? 'by pressure strike rate' : 'by pressure economy') + ', same pool'));
+  rows.push(kv('Consistency', Math.round(p.cons * 100) + '%', 'pressure matches in the black, diagnostic only'));
+  return rows.join('');
+}
+let rSide = 'bat';
+function chipClass(v) { return v >= .75 ? 'solid' : v >= .5 ? 'mid' : 'edge'; }
+function renderRank() {
+  const list = D[rSide].slice(0, 10), mx = Math.max(...list.map(p => p.rating));
+  $('#rankWrap').dataset.side = rSide;
+  $('#rankList').innerHTML = list.map(p => `<li><details><summary>
+    <span class="n">${p.rank}</span>
+    <span class="who"><b>${p.name}</b><span>${p.pb} pressure balls &middot; ${p.pm} matches &middot; last played ${p.last}</span></span>
+    <span class="meter"><span class="track"><span class="fill" style="display:block;width:${(p.rating / mx * 100).toFixed(1)}%"></span></span><span class="val"><b>${sgn(p.rating)}</b> runs/over above average</span></span>
+    <span class="chip ${chipClass(p.pt10)}">${Math.round(p.pt10 * 100)}% stay top 10</span><span class="chev"></span>
+  </summary><div class="detail">${detailHTML(p, rSide)}</div></details></li>`).join('');
+  $('#rankNote').textContent = rSide === 'bat'
+    ? 'Batters in the very top pressure tier are the least predictable group in our held-out tests, so read the order as tiers. Naive rank shows where each player would sit on raw pressure strike rate alone.'
+    : 'Bowlers are the more predictable group in our held-out tests. Naive rank shows where each player would sit on raw pressure economy alone.';
+}
+toggleGroup($('.toggle[aria-label="List"]'), 's', s => { rSide = s; renderRank(); });
+renderRank();
+
+/* explorer */
+let eSide = 'bat', sel = null;
+function renderScatter() {
+  const L = D[eSide], svg = $('#scatter'); svg.innerHTML = '';
+  const vals = L.flatMap(p => [p.p, p.o]); let lo = Math.min(...vals), hi = Math.max(...vals);
+  const pad = (hi - lo) * 0.06; lo -= pad; hi += pad;
+  const W = 640, H = 440, ml = 52, mr = 14, mt = 12, mb = 46;
+  const X = v => ml + (v - lo) / (hi - lo) * (W - ml - mr), Y = v => H - mb - (v - lo) / (hi - lo) * (H - mt - mb);
+  const step = eSide === 'bat' ? 20 : 1; const t0 = Math.ceil(lo / step) * step;
+  for (let t = t0; t <= hi; t += step) {
+    svgEl('line', { x1: X(t), x2: X(t), y1: mt, y2: H - mb, class: 'axis' }, svg); svgEl('line', { x1: ml, x2: W - mr, y1: Y(t), y2: Y(t), class: 'axis' }, svg);
+    svgEl('text', { x: X(t), y: H - mb + 16, 'text-anchor': 'middle' }, svg).textContent = t; svgEl('text', { x: ml - 8, y: Y(t) + 4, 'text-anchor': 'end' }, svg).textContent = t;
+  }
+  svgEl('line', { x1: X(lo), y1: Y(lo), x2: X(hi), y2: Y(hi), class: 'diag' }, svg);
+  svgEl('text', { x: (ml + W - mr) / 2, y: H - 8, 'text-anchor': 'middle' }, svg).textContent = eSide === 'bat' ? 'Strike rate in ordinary situations' : 'Economy in ordinary situations';
+  const yl = svgEl('text', { x: 0, y: 0, transform: `translate(14 ${(mt + H - mb) / 2}) rotate(-90)`, 'text-anchor': 'middle' }, svg); yl.textContent = eSide === 'bat' ? 'Strike rate under pressure' : 'Economy under pressure';
+  const col = eSide === 'bat' ? 'var(--accent)' : 'var(--blue)';
+  $('#lgTop').style.background = col;
+  [...L].sort((a, b) => b.rank - a.rank).forEach(p => {
+    const top = p.rank <= 10, g = svgEl('g', { class: 'pt', tabindex: 0, role: 'button', 'aria-label': p.name }, svg);
+    svgEl('circle', { cx: X(p.o), cy: Y(p.p), r: 18, fill: 'transparent' }, g);
+    const c = svgEl('circle', { cx: X(p.o), cy: Y(p.p), r: top ? 6 : 4.5, fill: top ? col : 'var(--ink3)', 'fill-opacity': top ? 1 : 0.55, stroke: sel && sel.id === p.id ? 'var(--ink)' : 'var(--surface)', 'stroke-width': sel && sel.id === p.id ? 2.5 : 1.5 }, g);
+    g.addEventListener('mousemove', e => showTip(e, `<b>${p.name}</b><br>#${p.rank} &middot; ${eSide === 'bat' ? 'SR' : 'Econ'} ${p.p} pressure, ${p.o} ordinary`));
+    g.addEventListener('mouseleave', hideTip); g.addEventListener('click', () => select(p)); g.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); select(p); } });
+  });
+  if (sel && sel.side === eSide) { const p = L.find(q => q.id === sel.id); if (p) svgEl('text', { x: X(p.o) + (X(p.o) > 520 ? 8 : 0), y: Y(p.p) - 12, 'text-anchor': X(p.o) > 520 ? 'end' : 'middle', style: 'fill:var(--ink);font-weight:500' }, svg).textContent = p.name; }
+  $('#lgHint').textContent = eSide === 'bat' ? 'Above the dashed line: faster under pressure' : 'Below the dashed line: cheaper under pressure';
+  $('#expLede').textContent = eSide === 'bat' ? 'Each dot is a batter. Raw strike rate alone barely separates players, which is why the rating adjusts for the situation, the bowlers faced and sample size. Click a dot or search by name.' : 'Each dot is a bowler. Economy under pressure is hard to read on its own, because the states differ. The rating compares each bowler with what an average bowler concedes in the same states. Click a dot or search by name.';
+  $('#pList').innerHTML = L.map(p => `<option value="${p.name}">`).join('');
+}
+function select(p) {
+  sel = { id: p.id, side: eSide }; $('#pSearch').value = p.name;
+  const s = eSide;
+  $('#pCard').innerHTML = `<h3>${p.name}</h3><div class="sub">${s === 'bat' ? 'Batter' : 'Bowler'} &middot; rank #${p.rank} of ${D[s].length} &middot; rating ${sgn(p.rating)} runs/over &middot; ${Math.round(p.pt10 * 100)}% stay in top 10</div><div class="grid">${detailHTML(p, s)}</div>`;
+  renderScatter();
+}
+toggleGroup($('.toggle[aria-label="Player type"]'), 's', s => { eSide = s; sel = null; $('#pSearch').value = ''; renderScatter(); select(D[s][0]); });
+$('#pSearch').addEventListener('change', e => { const p = D[eSide].find(q => q.name.toLowerCase() === e.target.value.trim().toLowerCase()); if (p) select(p); });
+renderScatter(); select(D.bat[0]);
+
+/* heat map */
+(function () {
+  const svg = $('#heat'), rows = D.heat_rows, H = D.heat; const ml = 46, mt = 6, cw = 25, ch = 32;
+  const mx = Math.max(...H.flat().filter(v => v != null));
+  rows.forEach((lab, r) => {
+    svgEl('text', { x: ml - 6, y: mt + (rows.length - 1 - r) * ch + ch / 2 + 4, 'text-anchor': 'end' }, svg).textContent = lab + '%';
+    H[r].forEach((v, c) => {
+      const rect = svgEl('rect', { x: ml + c * cw, y: mt + (rows.length - 1 - r) * ch, width: cw - 2, height: ch - 2, rx: 3, style: v == null ? 'fill:var(--surface2)' : `fill:color-mix(in srgb, var(--accent) ${Math.round(8 + v / mx * 92)}%, var(--surface))` }, svg);
+      rect.addEventListener('mousemove', e => showTip(e, v == null ? `Over ${c + 1}, win prob ${lab}%: too few balls` : `Over ${c + 1}, chasing side win prob ${lab}%<br>next ball swings win probability by <b>${v.toFixed(1)}</b> points`));
+      rect.addEventListener('mouseleave', hideTip);
+    });
+  });
+  for (let c = 0; c < 20; c += 2) svgEl('text', { x: ml + c * cw + cw / 2, y: mt + rows.length * ch + 14, 'text-anchor': 'middle' }, svg).textContent = c + 1;
+  svgEl('text', { x: ml + 10 * cw, y: mt + rows.length * ch + 30, 'text-anchor': 'middle' }, svg).textContent = 'Over of the chase';
+})();
+
+/* tier chart + cards */
+const TN = ['Ordinary', 'Elevated', 'High', 'Extreme'];
+function renderTier(met) {
+  const svg = $('#tierChart'); svg.innerHTML = '';
+  const v = TN.map(t => D.tiers[t][met]), mx = Math.max(...v) * 1.2; const ml = 12, bw = 82, gap = 34, base = 210;
+  v.forEach((x, i) => {
+    const h = x / mx * 170, xx = ml + i * (bw + gap) + 20;
+    svgEl('rect', { x: xx, y: base - h, width: bw, height: h, rx: 4, fill: i >= 2 ? 'var(--accent)' : 'color-mix(in srgb, var(--accent) 38%, var(--surface))' }, svg);
+    svgEl('text', { x: xx + bw / 2, y: base - h - 8, 'text-anchor': 'middle', style: 'fill:var(--ink);font-weight:500;font-size:13px' }, svg).textContent = x.toFixed(1) + '%';
+    svgEl('text', { x: xx + bw / 2, y: base + 20, 'text-anchor': 'middle' }, svg).textContent = TN[i];
+  });
+  svgEl('line', { x1: ml + 10, x2: 510, y1: base, y2: base, class: 'axis' }, svg);
+}
+toggleGroup($('#tierToggle'), 'm', renderTier); renderTier('dot');
+const tdesc = { Ordinary: 'Below the 60th percentile of leverage. The usual level of play.', Elevated: '60th to 90th percentile. The match is live and tightening.', High: '90th to 97th percentile. Close, late, and costly.', Extreme: 'Top 3%. A single ball can decide the match.' };
+const trng = { Ordinary: '< 60th pct', Elevated: '60th - 90th pct', High: '90th - 97th pct', Extreme: '97th pct +' };
+$('#tierCards').innerHTML = TN.map((t, i) => `<div class="tier" style="--t:${[15, 40, 75, 100][i]}%"><b>${t}</b><span class="rng">${trng[t]}</span><p>${tdesc[t]}</p><p class="mono" style="margin-top:8px;font-size:.75rem">${D.tiers[t].balls.toLocaleString()} balls</p></div>`).join('');
+
+/* value of a ball */
+(function () {
+  let ph = 'Death', ou = 'W';
+  const outs = [['0', 'Dot', 0, 0], ['1', 'Single', 1, 0], ['4', 'Four', 4, 0], ['6', 'Six', 6, 0], ['W', 'Wicket', 0, 1]];
+  const draw = () => {
+    $('#phBtns').innerHTML = ['Powerplay', 'Middle', 'Death'].map(p => `<button class="o" data-p="${p}" aria-pressed="${p === ph}">${p}</button>`).join('');
+    $('#ouBtns').innerHTML = outs.map(o => `<button class="o" data-o="${o[0]}" aria-pressed="${o[0] === ou}">${o[1]}</button>`).join('');
+    const e = D.phases[ph], o = outs.find(x => x[0] === ou), er = e.er, ew = e.ew / 100, C = e.C, W = o[3];
+    const V = (o[2] - er) - C * (W - ew);
+    $('#calcF').innerHTML = `V = (${o[2]} &minus; ${er.toFixed(2)}) &minus; ${C.toFixed(1)} &times; (${W} &minus; ${ew.toFixed(3)})<br>expected runs ${er.toFixed(2)} &middot; wicket chance ${e.ew}% &middot; wicket cost ${C.toFixed(1)} runs`;
+    const r = $('#calcR'); r.textContent = sgn(V) + ' runs'; r.className = 'res ' + (V >= 0 ? 'pos' : 'neg');
+    $('#calcT').textContent = V >= 0 ? 'Better than an average ball in this phase.' : 'Worse than an average ball in this phase' + (W ? `: a wicket costs ${C.toFixed(1)} runs in this phase. Early wickets cost more because more of the innings is still to play.` : '.');
+    $$('#phBtns button').forEach(b => b.onclick = () => { ph = b.dataset.p; draw(); }); $$('#ouBtns button').forEach(b => b.onclick = () => { ou = b.dataset.o; draw(); });
+  };
+  draw();
+})();
+
+/* evidence */
+let evS = 'bat', evT = 'Elev+';
+const PN = [['level', 'Pressure rating (ours)'], ['naive_overall_mean', 'Raw overall average'], ['naive_pressure_mean', 'Raw pressure-only average'], ['delta', 'Change from own baseline'], ['cons', 'Hit-rate consistency']];
+function renderEv() {
+  const svg = $('#evChart'); svg.innerHTML = '';
+  const get = (k, pr) => (D.val.find(v => v.kind === k && v.side === evS && v.tier === evT && v.pred === pr) || {}).rho;
+  const W = 700, ml = 190, mr = 50, rowH = 46, mt = 10, lo = -0.35, hi = 0.4; const X = v => ml + (v - lo) / (hi - lo) * (W - ml - mr);
+  [-0.3, -0.2, -0.1, 0, 0.1, 0.2, 0.3, 0.4].forEach(t => { svgEl('line', { x1: X(t), x2: X(t), y1: mt, y2: mt + PN.length * rowH, class: t === 0 ? 'diag' : 'axis' }, svg); svgEl('text', { x: X(t), y: mt + PN.length * rowH + 16, 'text-anchor': 'middle' }, svg).textContent = t.toFixed(1); });
+  PN.forEach(([pr, lab], i) => {
+    const y = mt + i * rowH, a = get('random-split mean', pr), t = get('temporal', pr), our = pr === 'level';
+    svgEl('text', { x: ml - 10, y: y + rowH / 2 + 4, 'text-anchor': 'end', style: our ? 'fill:var(--ink);font-weight:500;font-family:var(--body);font-size:12.5px' : 'font-family:var(--body);font-size:12.5px' }, svg).textContent = lab;
+    if (a != null) { svgEl('rect', { x: Math.min(X(0), X(a)), y: y + 10, width: Math.abs(X(a) - X(0)), height: 20, rx: 3, fill: our ? 'var(--accent)' : 'var(--ink3)', 'fill-opacity': our ? 1 : 0.55 }, svg);
+      svgEl('text', { x: a >= 0 ? X(a) + 6 : X(a) - 6, y: y + 25, 'text-anchor': a >= 0 ? 'start' : 'end', style: 'fill:var(--ink)' }, svg).textContent = sgn(a); }
+    if (t != null) svgEl('rect', { x: X(t) - 5, y: y + 15, width: 10, height: 10, transform: `rotate(45 ${X(t)} ${y + 20})`, fill: 'var(--warn)', stroke: 'var(--surface)', 'stroke-width': 1.5 }, svg);
+  });
+  const n = (D.val.find(v => v.kind === 'random-split mean' && v.side === evS && v.tier === evT) || {}).n;
+  $('#evN').textContent = 'About ' + Math.round(n) + ' players per test. Higher is better; zero means no predictive value.';
+}
+toggleGroup($('#evSide'), 's', s => { evS = s; renderEv(); renderStab(); }); toggleGroup($('#evTier'), 't', t => { evT = t; renderEv(); });
+function renderStab() {
+  const svg = $('#stab'); svg.innerHTML = ''; const L = D[evS].slice(0, 15), ml = 140, W = 520, rh = 24; const X = v => ml + v * (W - ml - 40);
+  [0, .25, .5, .75, 1].forEach(t => { svgEl('line', { x1: X(t), x2: X(t), y1: 0, y2: L.length * rh, class: t === .5 ? 'diag' : 'axis' }, svg); svgEl('text', { x: X(t), y: L.length * rh + 16, 'text-anchor': 'middle' }, svg).textContent = Math.round(t * 100) + '%'; });
+  const col = evS === 'bat' ? 'var(--accent)' : 'var(--blue)';
+  L.forEach((p, i) => { const y = i * rh;
+    svgEl('text', { x: ml - 8, y: y + 16, 'text-anchor': 'end', style: 'font-family:var(--body);font-size:12px' }, svg).textContent = p.rank + '. ' + p.name;
+    const r = svgEl('rect', { x: ml, y: y + 4, width: Math.max(2, p.pt10 * (W - ml - 40)), height: 14, rx: 2, fill: p.rank <= 10 ? col : 'var(--ink3)', 'fill-opacity': p.rank <= 10 ? 1 : 0.5 }, svg);
+    svgEl('text', { x: X(p.pt10) + 6, y: y + 16, style: 'fill:var(--ink)' }, svg).textContent = Math.round(p.pt10 * 100) + '%'; });
+  svg.setAttribute('viewBox', `0 0 520 ${L.length * rh + 26}`);
+}
+renderEv(); renderStab();
+const sl = { 'default': 'Final settings', 'alpha x3': 'Ridge strength x3', 'alpha /3': 'Ridge strength / 3', 'no pressure re-weight (k=0)': 'No pressure up-weighting', 'slope f=1': 'Looser pressure slope', 'level only': 'Rating only (final)', '0.8/0/0.2': 'Add 20% consistency', '0.5/0.25/0.25': 'Add delta and consistency (50/25/25)' };
+const byS = {}; D.sens.forEach(r => { (byS[r.setting] = byS[r.setting] || {})[r.side] = r.top10_overlap; });
+$('#sensBody').innerHTML = Object.keys(byS).filter(k => k !== 'default' && k !== 'level only').map(k => `<tr><td>${sl[k] || k}</td><td class="num">${byS[k].bat}/10</td><td class="num">${byS[k].bowl}/10</td></tr>`).join('');
+</script>

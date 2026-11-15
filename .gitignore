@@ -1,0 +1,20 @@
+# Local Python environments and caches
+.venv/
+venv/
+env/
+__pycache__/
+*.py[cod]
+
+# Local data inputs
+data/raw/
+
+# Pipeline-generated artifacts
+outputs/
+report/
+site/data.json
+
+# Local tooling and logs
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+*.log
